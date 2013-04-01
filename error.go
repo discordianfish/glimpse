@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	ErrConflict  = errors.New("object already exsits")
+	ErrConflict  = errors.New("object already exists")
 	ErrInvalidIP = errors.New("provided ip is not valid")
 	ErrNotFound  = errors.New("object not found")
 )
