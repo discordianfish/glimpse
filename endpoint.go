@@ -18,17 +18,17 @@ type Endpoint struct {
 	Port       uint16   `json:"port"`
 	Priority   uint16   `json:"priority,omitempty"`
 	Weight     uint16   `json:"weight,omitempty"`
-	Target     string   `json:"target,omitempty"`
+	Hostname   string   `json:"target,omitempty"`
 	Labels     []string `json:"labels"`
 	Registered string   `json:"registered"`
 }
 
-func (d *Directory) NewEndpoint(s *Service, ip string, port uint16, target string) *Endpoint {
+func (d *Directory) NewEndpoint(s *Service, ip string, port uint16, hostname string) *Endpoint {
 	e := &Endpoint{
-		Service: s,
-		IP:      ip,
-		Port:    port,
-		Target:  target,
+		Service:  s,
+		IP:       ip,
+		Port:     port,
+		Hostname: hostname,
 	}
 	e.file = cp.NewFile(e.path(), e, new(cp.JsonCodec), s.GetSnapshot())
 
@@ -105,8 +105,8 @@ func (e *Endpoint) WaitUnregister() error {
 }
 
 func (e *Endpoint) String() string {
-	f := "Endpoint<%s>{IP: %s, Port: %d, Priority: %d, Weight: %d, Target: %s, Registered: %s}"
-	return fmt.Sprintf(f, e.id(), e.IP, e.Port, e.Priority, e.Weight, e.Target, e.Registered)
+	f := "Endpoint<%s>{IP: %s, Port: %d, Priority: %d, Weight: %d, Hostname: %s, Registered: %s}"
+	return fmt.Sprintf(f, e.id(), e.IP, e.Port, e.Priority, e.Weight, e.Hostname, e.Registered)
 }
 
 func (e *Endpoint) path() string {
