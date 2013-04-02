@@ -19,6 +19,7 @@ type Endpoint struct {
 	Priority   uint16   `json:"priority,omitempty"`
 	Weight     uint16   `json:"weight,omitempty"`
 	Target     string   `json:"target,omitempty"`
+	Labels     []string `json:"labels"`
 	Registered string   `json:"registered"`
 }
 
