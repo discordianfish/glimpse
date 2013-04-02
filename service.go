@@ -188,7 +188,7 @@ func (d *Directory) GetService(name string) (*Service, error) {
 }
 
 // Services returns the list of all registered Services.
-func (d *Directory) Services() ([]*Service, error) {
+func (d *Directory) GetServices() ([]*Service, error) {
 	check, _, err := d.GetSnapshot().Exists(servicesPath)
 	if err != nil {
 		return nil, err
