@@ -235,7 +235,7 @@ func TestServices(t *testing.T) {
 		d = d.Join(s)
 	}
 
-	srvs, err := d.Services()
+	srvs, err := d.GetServices()
 	if err != nil {
 		t.Fatal(err)
 	}
