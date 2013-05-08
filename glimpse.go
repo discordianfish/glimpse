@@ -33,16 +33,7 @@ func (d *Directory) GetSnapshot() cp.Snapshot {
 	return d.snapshot
 }
 
-// Join advances the Directory in time. It returns a new
-// instance of Directory at the rev of the supplied
-// cp.Snapshotable.
-func (d *Directory) Join(sp cp.Snapshotable) *Directory {
-	tmp := *d
-	tmp.snapshot = sp.GetSnapshot()
-	return &tmp
-}
-
-func (d *Directory) FastForward() (*Directory, error) {
+func (d *Directory) fastForward() (*Directory, error) {
 	s, err := d.GetSnapshot().FastForward()
 	if err != nil {
 		return nil, err
@@ -57,7 +48,7 @@ func (d *Directory) Init() (*Directory, error) {
 	if err != nil {
 		return nil, err
 	}
-	d = d.Join(sp)
+	d.snapshot = sp
 
 	return d, nil
 }

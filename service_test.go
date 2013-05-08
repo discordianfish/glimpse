@@ -18,7 +18,7 @@ func setupService(name string, t *testing.T) (*Directory, *Service) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, err = d.FastForward()
+	d, err = d.fastForward()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,13 +72,12 @@ func TestServiceUnregistration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d, err = d.FastForward()
+	d, err = d.fastForward()
 	if err != nil {
 		t.Fatal(err)
 	}
-	s = s.Join(d)
 
-	check, _, err := s.GetSnapshot().Exists(s.dir.Name)
+	check, _, err := d.GetSnapshot().Exists(s.dir.Name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,27 +87,18 @@ func TestServiceUnregistration(t *testing.T) {
 }
 
 func TestServiceUnregistrationFailure(t *testing.T) {
-	d, s := setupService("srv-unregister-fail", t)
+	_, s := setupService("srv-unregister-fail", t)
 
 	s2, err := s.Register()
 	if err != nil {
 		t.Fatal(err)
-	}
-	err = s.Unregister()
-	if err == nil {
-		t.Fatal("Service allowed to unregister with old revision")
 	}
 	err = s2.Unregister()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	d, err = d.FastForward()
-	if err != nil {
-		t.Fatal(err)
-	}
-	s3 := s2.Join(d)
-	_, err = s3.Register()
+	_, err = s2.Register()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,14 +112,12 @@ func TestServiceGetEndpoints(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d = d.Join(s)
 	for i := 0; i < len(ids); i++ {
 		e := d.NewEndpoint(s, "1.2.3.4", uint16(8000+i), "oddhost.com")
 		e, err := e.Register()
 		if err != nil {
 			t.Fatal(err)
 		}
-		s = s.Join(e)
 	}
 
 	eps, err := s.GetEndpoints()
@@ -168,7 +156,6 @@ func TestServiceWaitEndpointRegister(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d = d.Join(s)
 	ep, err := d.NewEndpoint(s, "1.2.3.4", 1234, "example.com").Register()
 	if err != nil {
 		t.Fatal(err)
@@ -188,7 +175,6 @@ func TestServiceWaitEndpointUnregister(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d = d.Join(s)
 	ep, err := d.NewEndpoint(s, "1.2.3.4", 1234, "example.com").Register()
 	if err != nil {
 		t.Fatal(err)
@@ -232,7 +218,6 @@ func TestServices(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		d = d.Join(s)
 	}
 
 	srvs, err := d.GetServices()
