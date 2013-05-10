@@ -39,15 +39,6 @@ func (e *Endpoint) GetSnapshot() cp.Snapshot {
 	return e.file.Snapshot
 }
 
-// Join advances the Service in time. It returns a new
-// instance of Service at the rev of the supplied
-// cp.Snapshotable.
-func (e *Endpoint) Join(sp cp.Snapshotable) *Endpoint {
-	tmp := *e
-	tmp.file = e.file.Join(sp)
-	return &tmp
-}
-
 // Register adds the Service to the global directory.
 func (e *Endpoint) Register() (*Endpoint, error) {
 	ip := net.ParseIP(e.IP)
@@ -59,7 +50,6 @@ func (e *Endpoint) Register() (*Endpoint, error) {
 	if err != nil {
 		return nil, err
 	}
-	e = e.Join(sp)
 
 	exists, _, err := sp.Exists(e.path())
 	if err != nil {

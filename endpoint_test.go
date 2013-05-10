@@ -18,12 +18,11 @@ func setupEndpoint(ip string, port uint16, target string, sName string, t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, err = d.FastForward()
+	d, err = d.fastForward()
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := d.NewService(sName)
-	s.Join(d)
 
 	e := d.NewEndpoint(s, ip, port, target)
 
@@ -33,7 +32,7 @@ func setupEndpoint(ip string, port uint16, target string, sName string, t *testi
 func TestEndpointRegistration(t *testing.T) {
 	_, e := setupEndpoint("1.2.3.4", 1234, "host.com", "endpoint-register", t)
 
-	eFake := e.Join(e)
+	eFake := *e
 	eFake.IP = "wrong-ip"
 	_, err := eFake.Register()
 	if err == nil || !IsErrInvalidIP(err) {
@@ -63,28 +62,23 @@ func TestEndpointRegistration(t *testing.T) {
 }
 
 func TestEndpointUnregistration(t *testing.T) {
-	d, e := setupEndpoint("4.3.2.1", 4321, "hosted.com", "endpoint-unregister", t)
+	_, e := setupEndpoint("4.3.2.1", 4321, "hosted.com", "endpoint-unregister", t)
 
 	e2, err := e.Register()
 	if err != nil {
 		t.Fatal(err)
-	}
-	err = e.Unregister()
-	if err == nil {
-		t.Fatal("Endpoint allowed to unregister with old revision")
 	}
 	err = e2.Unregister()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	d, err = d.FastForward()
+	sp, err := e.GetSnapshot().FastForward()
 	if err != nil {
 		t.Fatal(err)
 	}
-	e = e.Join(d)
 
-	check, _, err := e.GetSnapshot().Exists(e.path())
+	check, _, err := sp.Exists(e.path())
 	if err != nil {
 		t.Fatal(err)
 	}

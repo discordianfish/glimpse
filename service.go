@@ -33,22 +33,12 @@ func (s *Service) GetSnapshot() cp.Snapshot {
 	return s.dir.GetSnapshot()
 }
 
-// Join advances the Service in time. It returns a new
-// instance of Service at the rev of the supplied
-// cp.Snapshotable.
-func (s *Service) Join(sp cp.Snapshotable) *Service {
-	tmp := *s
-	tmp.dir = s.dir.Join(sp)
-	return &tmp
-}
-
 // Register adds the Service to the global directory.
 func (s *Service) Register() (*Service, error) {
 	sp, err := s.dir.GetSnapshot().FastForward()
 	if err != nil {
 		return nil, err
 	}
-	s = s.Join(sp)
 
 	exists, _, err := sp.Exists(s.dir.Name)
 	if err != nil {
@@ -58,23 +48,33 @@ func (s *Service) Register() (*Service, error) {
 		return nil, ErrConflict
 	}
 
-	d, err := s.dir.Set(registeredPath, timestamp())
+	d, err := s.dir.Join(sp).Set(registeredPath, timestamp())
 	if err != nil {
 		return nil, err
 	}
-	return s.Join(d), nil
+	s.dir = d
+
+	return s, nil
 }
 
 // Unregister removes the Service from the global directory.
 func (s *Service) Unregister() error {
-	return s.dir.Del("/")
+	sp, err := s.GetSnapshot().FastForward()
+	if err != nil {
+		return err
+	}
+	return s.dir.Join(sp).Del("/")
 }
 
 // GetEndpoint fetches the Endpoint for the given id.
 func (s *Service) GetEndpoint(id string) (*Endpoint, error) {
 	codec := new(cp.JsonCodec)
 	codec.DecodedVal = &Endpoint{}
-	f, err := s.GetSnapshot().GetFile(s.endpointPath(id), codec)
+	sp, err := s.GetSnapshot().FastForward()
+	if err != nil {
+		return nil, err
+	}
+	f, err := sp.GetFile(s.endpointPath(id), codec)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,11 @@ func (s *Service) GetEndpoint(id string) (*Endpoint, error) {
 
 // GetEndpoints fetches all Endpoints of the Service
 func (s *Service) GetEndpoints() ([]*Endpoint, error) {
-	ids, err := s.GetSnapshot().Getdir(s.dir.Prefix(endpointsPath))
+	sp, err := s.GetSnapshot().FastForward()
+	if err != nil {
+		return nil, err
+	}
+	ids, err := sp.Getdir(s.dir.Prefix(endpointsPath))
 	if err != nil {
 		return nil, err
 	}
@@ -127,13 +131,13 @@ func (s *Service) WaitUnregister() error {
 // WaitEndpointRegister blocks until a new Endpoint is registered
 // for the Service and returns the new Endpoint.
 func (s *Service) WaitEndpointRegister() (*Endpoint, error) {
+	sp := s.GetSnapshot()
 	for {
-		sp := s.GetSnapshot()
 		ev, err := sp.Wait(path.Join(s.dir.Prefix(endpointsPath), "*"))
 		if err != nil {
 			return nil, err
 		}
-		s = s.Join(ev)
+		sp = sp.Join(ev)
 		if ev.IsSet() {
 			id := strings.SplitN(ev.Path, "/", 5)[4]
 			return s.GetEndpoint(id)
@@ -175,8 +179,12 @@ func (s *Service) endpointPath(id string) string {
 
 // GetService fetches the Service for the given name.
 func (d *Directory) GetService(name string) (*Service, error) {
-	s := d.NewService(name)
+	d, err := d.fastForward()
+	if err != nil {
+		return nil, err
+	}
 
+	s := d.NewService(name)
 	check, _, err := d.GetSnapshot().Exists(s.dir.Prefix(registeredPath))
 	if err != nil {
 		return nil, err
@@ -189,6 +197,10 @@ func (d *Directory) GetService(name string) (*Service, error) {
 
 // Services returns the list of all registered Services.
 func (d *Directory) GetServices() ([]*Service, error) {
+	d, err := d.fastForward()
+	if err != nil {
+		return nil, err
+	}
 	check, _, err := d.GetSnapshot().Exists(servicesPath)
 	if err != nil {
 		return nil, err
@@ -221,13 +233,13 @@ func (d *Directory) GetServices() ([]*Service, error) {
 // WaitServiceRegister blocks until a new Service is registered
 // and returns the new Service.
 func (d *Directory) WaitServiceRegister() (*Service, error) {
+	sp := d.GetSnapshot()
 	for {
-		sp := d.GetSnapshot()
 		ev, err := sp.Wait(path.Join(servicesPath, "*", registeredPath))
 		if err != nil {
 			return nil, err
 		}
-		d = d.Join(ev)
+		sp = sp.Join(ev)
 		if ev.IsSet() {
 			name := strings.SplitN(ev.Path, "/", 4)[2]
 			return d.GetService(name)
