@@ -105,7 +105,7 @@ func TestServiceUnregistrationFailure(t *testing.T) {
 }
 
 func TestServiceGetEndpoints(t *testing.T) {
-	d, s := setupService("srv-getendpoints", t)
+	_, s := setupService("srv-getendpoints", t)
 	ids := map[string]bool{"1.2.3.4-8000": true, "1.2.3.4-8001": true, "1.2.3.4-8002": true}
 
 	s, err := s.Register()
@@ -113,7 +113,7 @@ func TestServiceGetEndpoints(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := 0; i < len(ids); i++ {
-		e := d.NewEndpoint(s, "1.2.3.4", uint16(8000+i), "oddhost.com")
+		e := s.NewEndpoint("1.2.3.4", uint16(8000+i), "oddhost.com")
 		e, err := e.Register()
 		if err != nil {
 			t.Fatal(err)
@@ -151,12 +151,12 @@ func TestServiceWaitUnregister(t *testing.T) {
 }
 
 func TestServiceWaitEndpointRegister(t *testing.T) {
-	d, s := setupService("srv-wait-endpoint-register", t)
+	_, s := setupService("srv-wait-endpoint-register", t)
 	s, err := s.Register()
 	if err != nil {
 		t.Fatal(err)
 	}
-	ep, err := d.NewEndpoint(s, "1.2.3.4", 1234, "example.com").Register()
+	ep, err := s.NewEndpoint("1.2.3.4", 1234, "example.com").Register()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,12 +170,12 @@ func TestServiceWaitEndpointRegister(t *testing.T) {
 }
 
 func TestServiceWaitEndpointUnregister(t *testing.T) {
-	d, s := setupService("srv-wait-endpoint-unregister", t)
+	_, s := setupService("srv-wait-endpoint-unregister", t)
 	s, err := s.Register()
 	if err != nil {
 		t.Fatal(err)
 	}
-	ep, err := d.NewEndpoint(s, "1.2.3.4", 1234, "example.com").Register()
+	ep, err := s.NewEndpoint("1.2.3.4", 1234, "example.com").Register()
 	if err != nil {
 		t.Fatal(err)
 	}

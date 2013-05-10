@@ -23,7 +23,7 @@ type Endpoint struct {
 	Registered string   `json:"registered"`
 }
 
-func (d *Directory) NewEndpoint(s *Service, ip string, port uint16, hostname string) *Endpoint {
+func (s *Service) NewEndpoint(ip string, port uint16, hostname string) *Endpoint {
 	e := &Endpoint{
 		Service:  s,
 		IP:       ip,

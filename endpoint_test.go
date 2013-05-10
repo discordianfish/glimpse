@@ -24,7 +24,7 @@ func setupEndpoint(ip string, port uint16, target string, sName string, t *testi
 	}
 	s := d.NewService(sName)
 
-	e := d.NewEndpoint(s, ip, port, target)
+	e := s.NewEndpoint(ip, port, target)
 
 	return d, e
 }
