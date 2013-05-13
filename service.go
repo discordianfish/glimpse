@@ -76,6 +76,9 @@ func (s *Service) GetEndpoint(id string) (*Endpoint, error) {
 	}
 	f, err := sp.GetFile(s.endpointPath(id), codec)
 	if err != nil {
+		if cp.IsErrNoEnt(err) {
+			err = ErrNotFound
+		}
 		return nil, err
 	}
 	e := f.Value.(*Endpoint)
