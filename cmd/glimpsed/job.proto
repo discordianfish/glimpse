@@ -1,0 +1,20 @@
+package main;
+
+message Service {
+  required string name = 1;
+  optional string host = 2;
+  optional uint32 port = 3;
+}
+
+message Instance {
+  required uint32 index = 1;
+  repeated Service services = 2;
+}
+
+message Job {
+  optional string zone = 1;
+  optional string product = 2;
+  optional string env = 3;
+  optional string name = 4;
+  repeated Instance instances = 5;
+}
