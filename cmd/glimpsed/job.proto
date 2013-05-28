@@ -1,6 +1,6 @@
-package main;
+package glimpse;
 
-message Service {
+message Endpoint {
   required string name = 1;
   optional string host = 2;
   optional uint32 port = 3;
@@ -8,7 +8,7 @@ message Service {
 
 message Instance {
   required uint32 index = 1;
-  repeated Service services = 2;
+  repeated Endpoint endpoint = 2;
 }
 
 message Job {
@@ -16,5 +16,5 @@ message Job {
   optional string product = 2;
   optional string env = 3;
   optional string name = 4;
-  repeated Instance instances = 5;
+  repeated Instance instance = 5;
 }

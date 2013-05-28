@@ -4,13 +4,52 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"path"
 	"regexp"
+	"sort"
 	"strings"
 
 	"code.google.com/p/goprotobuf/proto"
 )
 
 var label = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+
+type ServiceAddress string
+
+func (p ServiceAddress) JobPath() string {
+	return path.Dir(string(p))
+}
+
+type Service struct {
+	*Job
+	*Instance
+	*Endpoint
+}
+
+func (s Service) Address() ServiceAddress {
+	return ServiceAddress(fmt.Sprintf("/%s/%s/%s/%s/%d:%s",
+		s.Job.GetZone(),
+		s.Job.GetProduct(),
+		s.Job.GetEnv(),
+		s.Job.GetName(),
+		s.Instance.GetIndex(),
+		s.Endpoint.GetName(),
+	))
+}
+
+func (s Service) String() string {
+	return fmt.Sprintf("%s %s:%d",
+		s.Address(),
+		s.Endpoint.GetHost(),
+		s.Endpoint.GetPort(),
+	)
+}
+
+type ServiceGroup []Service
+
+func (g ServiceGroup) Less(i, j int) bool { return g[i].String() < g[j].String() }
+func (g ServiceGroup) Swap(i, j int)      { g[i], g[j] = g[j], g[i] }
+func (g ServiceGroup) Len() int           { return len(g) }
 
 type validationErrors []string
 
@@ -42,9 +81,30 @@ func (j *Job) Validate() error {
 	return v.Result()
 }
 
+func (j *Job) Services() []Service {
+	var sg ServiceGroup
+	if j == nil {
+		return []Service{}
+	}
+
+	for _, instance := range j.GetInstance() {
+		for _, endpoint := range instance.GetEndpoint() {
+			srv := Service{
+				Job:      j,
+				Instance: instance,
+				Endpoint: endpoint,
+			}
+			sg = append(sg, srv)
+		}
+	}
+
+	sort.Sort(sg)
+	return sg
+}
+
 func DecodeJob(r io.Reader) (*Job, error) {
 	body, err := ioutil.ReadAll(r)
-	if err != nil {
+	if len(body) == 0 || err != nil {
 		return nil, fmt.Errorf("short request body: %v", err)
 	}
 

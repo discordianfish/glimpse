@@ -5,32 +5,8 @@ import (
 	"io"
 	"net/http"
 	"path"
-	"strconv"
 	"strings"
 )
-
-func catch(w http.ResponseWriter) {
-	if err := recover(); err != nil {
-		code := http.StatusInternalServerError
-		if guard, ok := err.(httpGuard); ok {
-			code = guard.code
-		}
-		http.Error(w, fmt.Sprint(err), code)
-	}
-}
-
-type httpGuard struct {
-	code int
-	err  error
-}
-
-func (e httpGuard) Error() string { return e.err.Error() }
-
-func guard(code int, err error) {
-	if err != nil {
-		panic(httpGuard{code, err})
-	}
-}
 
 func validateJobPath(path Path, job *Job) error {
 	if path != job.Path() {
@@ -39,10 +15,18 @@ func validateJobPath(path Path, job *Job) error {
 	return nil
 }
 
+func getEtag(r *http.Request) int64 {
+	var rev int64
+	fmt.Sscan(strings.Trim(r.Header.Get("Etag"), `"`), &rev)
+	return rev
+}
+
+func setEtag(w http.ResponseWriter, rev int64) {
+	w.Header().Set("Etag", fmt.Sprintf(`"%d"`, rev))
+}
+
 func JobPut(store Store) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer catch(w)
-
 		if !strings.Contains(r.Header.Get("Content-Type"), "application/x-protobuf") {
 			guard(412, fmt.Errorf("expecting application/x-protobuf Content-Type"))
 		}
@@ -51,19 +35,20 @@ func JobPut(store Store) http.Handler {
 		guard(500, err)
 
 		err = validateJobPath(Path(r.URL.Path), job)
+		// FIXME - test validation
 		guard(422, err)
 
-		ref, err := store.Put(Ref{job, 0})
+		ref, err := store.Put(Ref{job, getEtag(r)})
+		// FIXME - test conflict
 		guard(409, err)
 
-		w.Header().Set("Etag", fmt.Sprintf(`"%d"`, ref.Rev))
+		// FIXME - test etag round trip
+		setEtag(w, ref.Rev)
 	})
 }
 
 func JobGet(store Store) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer catch(w)
-
 		if !strings.Contains(r.Header.Get("Accept"), "application/x-protobuf") {
 			guard(406, fmt.Errorf("expecting to Accept application/x-protobuf"))
 		}
@@ -76,63 +61,139 @@ func JobGet(store Store) http.Handler {
 			return
 		}
 
-		w.Header().Set("Etag", fmt.Sprintf(`"%d"`, ref.Rev))
+		setEtag(w, ref.Rev)
 		EncodeJob(w, ref.Job)
 	})
 }
 
-type binding struct {
-	*Job
-	*Instance
-	*Service
+type glob struct {
+	zone     string
+	product  string
+	env      string
+	name     string
+	index    string
+	endpoint string
 }
 
-func bindings(refs []Ref) []binding {
-	var binds []binding
-	for _, ref := range refs {
-		if ref.Job != nil {
-			for _, inst := range ref.Job.GetInstances() {
-				for _, srv := range inst.GetServices() {
-					binds = append(binds, binding{ref.Job, inst, srv})
-				}
-			}
-		}
-	}
-	return binds
+func (g glob) String() string {
+	return "/" + path.Join(g.zone, g.product, g.env, g.name)
 }
 
-func matchServices(index, service string, bindings []binding) []binding {
-	var binds []binding
-	for _, bind := range bindings {
-		if index == "" || index == "*" || index == strconv.Itoa(int(bind.Instance.GetIndex())) {
-			if service == "*" || service == bind.Service.GetName() {
-				binds = append(binds, bind)
-			}
-		}
+func (g glob) Path() Path {
+	return Path(g.String())
+}
+
+func (g glob) ServiceAddress() ServiceAddress {
+	return ServiceAddress(g.String() + "/" + g.index + ":" + g.endpoint)
+}
+
+func requestToGlob(r *http.Request) glob {
+	q := r.URL.Query()
+	g := glob{
+		zone:    q.Get(":zone"),
+		product: q.Get(":product"),
+		env:     q.Get(":env"),
+		name:    q.Get(":name"),
 	}
-	return binds
+	if g.zone == "" {
+		g.zone = "*"
+	}
+	if g.product == "" {
+		g.product = "*"
+	}
+	if g.env == "" {
+		g.env = "*"
+	}
+	if g.name == "" {
+		g.name = "*"
+	}
+
+	g.index = q.Get(":index")
+	if g.index == "" {
+		g.index = "*"
+	}
+
+	g.endpoint = q.Get(":endpoint")
+	if len(g.endpoint) > 0 {
+		// FIXME stripping colon from this param is a bug in the 'pat' router
+		g.endpoint = g.endpoint[1:len(g.endpoint)]
+	}
+	if g.endpoint == "" {
+		g.endpoint = "*"
+	}
+
+	return g
+}
+
+func MatchOrWatch(match, watch http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Accept") == "text/event-stream" {
+			watch.ServeHTTP(w, r)
+		} else {
+			match.ServeHTTP(w, r)
+		}
+	})
+}
+
+func flush(w interface{}) {
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func writeSetEvent(w io.Writer, services []Service) {
+	fmt.Fprint(w, "event: set\n")
+	for _, srv := range services {
+		fmt.Fprintf(w, "data: %s\n", srv.String())
+	}
+	fmt.Fprint(w, "\n")
+	flush(w)
+}
+
+func writeChangeEvent(w io.Writer, c Change) error {
+	if _, err := fmt.Fprintf(w, "event: %s\n", c.Operation()); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "data: %s\n\n", c.Service().String()); err != nil {
+		return err
+	}
+
+	flush(w)
+	return nil
+}
+
+func Watch(store Store) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		glob := requestToGlob(r)
+		changes := make(chan Change)
+
+		more := make(chan bool)
+		defer close(more)
+
+		services, err := store.Match(glob.ServiceAddress(), func(c Change) bool {
+			changes <- c
+			return <-more
+		})
+		guard(500, err)
+
+		writeSetEvent(w, services)
+		for c := range changes {
+			if err := writeChangeEvent(w, c); err != nil {
+				return
+			}
+			more <- true
+		}
+	})
 }
 
 func Match(store Store) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		q := r.URL.Query()
-		glob := "/" + path.Join(q.Get(":zone"), q.Get(":product"), q.Get(":env"), q.Get(":name"))
-		index := q.Get(":index")
-		service := q.Get(":service")
-		if len(service) > 0 { // FIXME stripping colon from service in the wrong place
-			service = service[1:len(service)]
-		}
-
-		refs, err := store.Glob(Path(glob))
+		glob := requestToGlob(r)
+		services, err := store.Match(glob.ServiceAddress(), nil)
 		guard(500, err)
 
-		for _, bind := range matchServices(index, service, bindings(refs)) {
-			fmt.Fprintf(w, "%s/%d:%s %s:%d\n",
-				bind.Job.Path(),
-				bind.Instance.GetIndex(),
-				bind.Service.GetName(),
-				bind.Service.GetHost(),
-				bind.Service.GetPort())
+		for _, srv := range services {
+			fmt.Fprint(w, srv.String()+"\n")
 		}
 	})
 }
@@ -145,26 +206,41 @@ func prefix(path string, count int) string {
 	return strings.Join(parts, "/")
 }
 
-func list(w io.Writer, r *http.Request, item string) {
+func formatText(w io.Writer, format string, args ...interface{}) error {
+	_, err := fmt.Fprintf(w, format, args...)
+	return err
+}
+
+func formatLink(w io.Writer, format string, args ...interface{}) error {
+	item := fmt.Sprintf(format, args...)
+	_, err := fmt.Fprintf(w, `<a style="display:block" href="%s">%s</a>`, item, item)
+	return err
+}
+
+type formatter func(io.Writer, string, ...interface{}) error
+
+func linker(r *http.Request) formatter {
 	accept := r.Header.Get("Accept")
-	if strings.Contains(accept, "html") || strings.Contains(accept, "*") {
-		fmt.Fprintf(w, `<a style="display:block" href="%s">%s</a>`, item, item)
+	if strings.Contains(accept, "html") {
+		return formatLink
 	} else {
-		w.Write([]byte(item))
+		return formatText
 	}
 }
 
-func BrowseServices(store Store) http.Handler {
+func BrowseEndpoints(store Store) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ref, err := store.Get(Path(r.URL.Path))
+		glob := requestToGlob(r)
+		srvs, err := store.Match(glob.ServiceAddress(), nil)
 		guard(500, err)
 
+		link := linker(r)
 		found := make(map[string]bool)
-		for _, bind := range bindings([]Ref{*ref}) {
-			name := bind.Service.GetName()
+		for _, bind := range srvs {
+			name := bind.Endpoint.GetName()
 			if !found[name] {
 				found[name] = true
-				list(w, r, fmt.Sprintf("%s:%s\n", bind.Job.Path(), name))
+				link(w, "%s:%s\n", bind.Job.Path(), name)
 			}
 		}
 	})
@@ -172,23 +248,17 @@ func BrowseServices(store Store) http.Handler {
 
 func Browse(store Store, fields ...string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tmpl := []string{"*", "*", "*", "*"}
-
-		q := r.URL.Query()
-		for i, f := range fields {
-			tmpl[i] = q.Get(":" + f)
-		}
-		glob := Path("/" + path.Join(tmpl...))
-
-		refs, err := store.Glob(glob)
+		glob := requestToGlob(r)
+		srvs, err := store.Match(glob.ServiceAddress(), nil)
 		guard(500, err)
 
+		link := linker(r)
 		found := make(map[string]bool)
-		for _, ref := range refs {
-			child := prefix(string(ref.Job.Path()), len(fields)+2)
+		for _, bind := range srvs {
+			child := prefix(string(bind.Job.Path()), len(fields)+2)
 			if !found[child] {
 				found[child] = true
-				list(w, r, fmt.Sprintf("%s\n", child))
+				link(w, "%s\n", child)
 			}
 		}
 	})

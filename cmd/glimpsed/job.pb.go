@@ -13,32 +13,32 @@ var _ = proto.Marshal
 var _ = &json.SyntaxError{}
 var _ = math.Inf
 
-type Service struct {
+type Endpoint struct {
 	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
 	Host             *string `protobuf:"bytes,2,opt,name=host" json:"host,omitempty"`
 	Port             *uint32 `protobuf:"varint,3,opt,name=port" json:"port,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *Service) Reset()         { *m = Service{} }
-func (m *Service) String() string { return proto.CompactTextString(m) }
-func (*Service) ProtoMessage()    {}
+func (m *Endpoint) Reset()         { *m = Endpoint{} }
+func (m *Endpoint) String() string { return proto.CompactTextString(m) }
+func (*Endpoint) ProtoMessage()    {}
 
-func (m *Service) GetName() string {
+func (m *Endpoint) GetName() string {
 	if m != nil && m.Name != nil {
 		return *m.Name
 	}
 	return ""
 }
 
-func (m *Service) GetHost() string {
+func (m *Endpoint) GetHost() string {
 	if m != nil && m.Host != nil {
 		return *m.Host
 	}
 	return ""
 }
 
-func (m *Service) GetPort() uint32 {
+func (m *Endpoint) GetPort() uint32 {
 	if m != nil && m.Port != nil {
 		return *m.Port
 	}
@@ -46,9 +46,9 @@ func (m *Service) GetPort() uint32 {
 }
 
 type Instance struct {
-	Index            *uint32    `protobuf:"varint,1,req,name=index" json:"index,omitempty"`
-	Services         []*Service `protobuf:"bytes,2,rep,name=services" json:"services,omitempty"`
-	XXX_unrecognized []byte     `json:"-"`
+	Index            *uint32     `protobuf:"varint,1,req,name=index" json:"index,omitempty"`
+	Endpoint         []*Endpoint `protobuf:"bytes,2,rep,name=endpoint" json:"endpoint,omitempty"`
+	XXX_unrecognized []byte      `json:"-"`
 }
 
 func (m *Instance) Reset()         { *m = Instance{} }
@@ -62,9 +62,9 @@ func (m *Instance) GetIndex() uint32 {
 	return 0
 }
 
-func (m *Instance) GetServices() []*Service {
+func (m *Instance) GetEndpoint() []*Endpoint {
 	if m != nil {
-		return m.Services
+		return m.Endpoint
 	}
 	return nil
 }
@@ -74,7 +74,7 @@ type Job struct {
 	Product          *string     `protobuf:"bytes,2,opt,name=product" json:"product,omitempty"`
 	Env              *string     `protobuf:"bytes,3,opt,name=env" json:"env,omitempty"`
 	Name             *string     `protobuf:"bytes,4,opt,name=name" json:"name,omitempty"`
-	Instances        []*Instance `protobuf:"bytes,5,rep,name=instances" json:"instances,omitempty"`
+	Instance         []*Instance `protobuf:"bytes,5,rep,name=instance" json:"instance,omitempty"`
 	XXX_unrecognized []byte      `json:"-"`
 }
 
@@ -110,9 +110,9 @@ func (m *Job) GetName() string {
 	return ""
 }
 
-func (m *Job) GetInstances() []*Instance {
+func (m *Job) GetInstance() []*Instance {
 	if m != nil {
-		return m.Instances
+		return m.Instance
 	}
 	return nil
 }
