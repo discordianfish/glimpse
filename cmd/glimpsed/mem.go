@@ -14,19 +14,17 @@ type Mem struct {
 }
 
 func newMemStore() *Mem {
-	const transactionLogSize = 100000
-
-	m := &Mem{
-		jobs:    make(map[Path]*Job),
-		watches: make(map[ServiceAddress][]WatchFunc),
+	return &Mem{
+		jobs:    map[Path]*Job{},
+		watches: map[ServiceAddress][]WatchFunc{},
 	}
-	return m
 }
 
+// Holds write lock
 func (s Mem) broadcast(ch Change) {
 	addr := ch.Service().Address()
-	alive := make([]WatchFunc, 0)
 
+	alive := []WatchFunc{}
 	for watch, funcs := range s.watches {
 		alive = alive[:0]
 		if watch.Match(addr) {
@@ -108,17 +106,3 @@ func (s Mem) Match(glob ServiceAddress, watch WatchFunc) ([]Service, error) {
 
 	return srvs, nil
 }
-
-/*
-func (s Mem) Wait(glob Path, instanceIndex, endpointName string, rev int64) ([]Op, int64, error) {
-	w := wait{rev: rev, res: make(chan Op)}
-	s.waits <- w
-
-	var ops []Op
-	for op := range w.res {
-		ops = append(ops, op)
-	}
-
-	return ops, s.rev, nil
-}
-*/

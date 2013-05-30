@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"code.google.com/p/goprotobuf/proto"
@@ -40,6 +41,16 @@ const waitCondition = "waiting for jobs"
 
 type db struct {
 	db *sql.DB
+
+	m       sync.Mutex // protects below
+	watches []*dbWatch
+}
+
+type dbWatch struct {
+	glob     ServiceAddress
+	rev      int64
+	callback WatchFunc
+	jobs     []*Job
 }
 
 func newDBStore(dsn string) (*db, error) {
@@ -48,7 +59,16 @@ func newDBStore(dsn string) (*db, error) {
 		return nil, fmt.Errorf("failed to open database: %v", err)
 	}
 
-	return &db{db: conn}, conn.Ping()
+	if err := conn.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping database: %v", err)
+	}
+
+	db := &db{
+		db:      conn,
+		watches: []*dbWatch{},
+	}
+	go db.sync()
+	return db, nil
 }
 
 func (s db) ensureSchema() error {
@@ -68,13 +88,13 @@ func (s *db) resetData() error {
 	return nil
 }
 
-func (s db) tx(fn func(*sql.Tx) error) error {
+func (s db) tx(transaction func(*sql.Tx) error) error {
 	t, err := s.db.Begin()
 	if err != nil {
 		return err
 	}
 
-	if err := fn(t); err != nil {
+	if err := transaction(t); err != nil {
 		if err := t.Rollback(); err != nil {
 			log.Printf("db: rollback unsuccessful: %v", err)
 		}
@@ -86,6 +106,12 @@ func (s db) tx(fn func(*sql.Tx) error) error {
 	}
 
 	return nil
+}
+
+func (s *db) listen(w *dbWatch) {
+	s.m.Lock()
+	defer s.m.Unlock()
+	s.watches = append(s.watches, w)
 }
 
 func (s db) notify() error {
@@ -117,35 +143,85 @@ type job struct {
 	rev  int64
 }
 
-func (s db) wait(rev int64) ([]job, error) {
-	_, err := s.db.Exec(`do sleep('60 ` + waitCondition + `')`)
-
-	// we've been killed or the connection has errored
-	// throttle ourselves until we can resume operation
-	if err != nil {
-		time.Sleep(time.Second)
+func byPath(jobs []*Job) map[Path]*Job {
+	m := map[Path]*Job{}
+	for _, job := range jobs {
+		m[job.Path()] = job
 	}
+	return m
+}
 
-	rows, err := s.db.Query(`
-		select path, data, rev
-		  from jobs
-		 where rev > ?
-		 order by rev
-	`, rev)
-	if err != nil {
-		return nil, err
-	}
+func diff(olds []*Job, updates []*Job) []Change {
+	changes := []Change{}
 
-	var jobs []job
-	for rows.Next() {
-		var j job
-		err := rows.Scan(&j.path, &j.data, &j.rev)
-		if err != nil {
-			return nil, err
+	oldMap := byPath(olds)
+	newMap := byPath(updates)
+
+	for path, old := range oldMap {
+		if updated := newMap[path]; updated != nil {
+			changes = append(changes, (*Job).Diff(old, updated)...)
+			delete(newMap, path)
 		}
-		jobs = append(jobs, j)
 	}
-	return jobs, nil
+
+	for _, add := range newMap {
+		changes = append(changes, (*Job).Diff(nil, add)...)
+	}
+
+	return changes
+}
+
+func (s *db) sync() {
+	for {
+		// Keeps the config in the session
+		err := s.tx(func(tx *sql.Tx) error {
+			s.db.Exec(`set session long_query_time=61`)
+			defer s.db.Exec(`set session long_query_time=DEFAULT`)
+			if _, err := s.db.Exec(`do sleep('60 ` + waitCondition + `')`); err != nil {
+				return err
+			}
+			return nil
+		})
+
+		// we've been killed or the connection has errored
+		// throttle ourselves until we can resume operation
+		if err != nil {
+			log.Println("db error in sync:", err)
+			time.Sleep(time.Second)
+			continue
+		}
+
+		func() { // critical section
+			s.m.Lock()
+			defer s.m.Unlock()
+			var keep []*dbWatch
+
+			if len(s.watches) > 0 {
+			keepers:
+				for _, ws := range s.watches {
+					jobs, nextRev, err := s.jobs(ws.glob.JobPath(), ws.rev)
+					fmt.Println(ws.glob, ws.rev, nextRev, diff(ws.jobs, jobs))
+					if err != nil {
+						continue keepers
+					}
+
+					for _, ch := range diff(ws.jobs, jobs) {
+						if !ws.callback(ch) {
+							continue keepers
+						}
+					}
+
+					// record the state we've seen up until now
+					ws.jobs = jobs
+					ws.rev = nextRev
+
+					keep = append(keep, ws)
+				}
+
+				s.watches = append(s.watches[:0], keep...)
+			}
+		}()
+	}
 }
 
 func (s db) Put(ref Ref) (Ref, error) {
@@ -161,7 +237,7 @@ func (s db) put(path string, data []byte, oldRev int64) (int64, error) {
 	var rev int64
 
 	err := s.tx(func(tx *sql.Tx) error {
-		/*
+		if oldRev > 0 {
 			err := tx.QueryRow(`
 				select rev
 				  from jobs
@@ -177,7 +253,7 @@ func (s db) put(path string, data []byte, oldRev int64) (int64, error) {
 			if rev > oldRev {
 				return ErrConflict
 			}
-		*/
+		}
 
 		res, err := tx.Exec(`
 			update seq set cur = last_insert_id(cur+1)
@@ -202,12 +278,15 @@ func (s db) put(path string, data []byte, oldRev int64) (int64, error) {
 
 		return err
 	})
-
 	if err != nil {
 		return 0, err
 	}
 
-	return rev, s.notify()
+	if err := s.notify(); err != nil {
+		return rev, err
+	}
+
+	return rev, nil
 }
 
 func (s db) Get(path Path) (*Ref, error) {
@@ -235,56 +314,70 @@ func (s db) Get(path Path) (*Ref, error) {
 	return ref, nil
 }
 
-func (s db) services(glob string) ([]Service, error) {
+func (s db) jobs(glob string, rev int64) ([]*Job, int64, error) {
+	max := rev
 	data := []byte{}
-	srvs := []Service{}
+	jobs := []*Job{}
 
 	rows, err := s.db.Query(`
-		select data
+		select rev, data
 		  from jobs
 		 where path like replace(?, '*', '%')
-	`, glob)
+		   and rev > ?
+		 order by path, rev
+	`, glob, rev)
 
 	if err != nil {
-		return srvs, err
+		return nil, max, err
 	}
 
 	for rows.Next() {
-		if err := rows.Scan(&data); err != nil {
-			return srvs, err
+		if err := rows.Scan(&rev, &data); err != nil {
+			return nil, max, err
+		}
+
+		if rev > max {
+			max = rev
 		}
 
 		job := new(Job)
 		if err := proto.Unmarshal(data, job); err != nil {
-			return srvs, err
+			return nil, max, err
 		}
 
-		for _, srv := range job.Services() {
-			srvs = append(srvs, srv)
-		}
+		jobs = append(jobs, job)
 	}
 
 	if err := rows.Err(); err != nil {
-		return srvs, err
+		return jobs, max, err
 	}
 
-	return srvs, nil
+	return jobs, max, nil
 }
 
-func (s db) Match(glob ServiceAddress, watch WatchFunc) ([]Service, error) {
-	srvs, err := s.services(glob.JobPath())
-	if err != nil {
-		return srvs, err
-	}
+func services(glob ServiceAddress, jobs []*Job) []Service {
+	srvs := []Service{}
 
-	match := []Service{}
-	for _, srv := range srvs {
-		if glob.Match(srv.Address()) {
-			match = append(match, srv)
+	for _, job := range jobs {
+		for _, srv := range job.Services() {
+			if glob.Match(srv.Address()) {
+				srvs = append(srvs, srv)
+			}
 		}
 	}
 
-	// TODO register watch @ latest revision
+	return srvs
+}
 
-	return match, nil
+func (s *db) Match(glob ServiceAddress, watch WatchFunc) ([]Service, error) {
+	jobs, max, err := s.jobs(glob.JobPath(), 0)
+	if err != nil {
+		return nil, err
+	}
+
+	if watch != nil {
+		s.listen(&dbWatch{glob, max, watch, jobs})
+	}
+
+	return services(glob, jobs), nil
 }

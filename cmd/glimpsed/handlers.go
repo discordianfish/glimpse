@@ -235,7 +235,7 @@ func BrowseEndpoints(store Store) http.Handler {
 		guard(500, err)
 
 		link := linker(r)
-		found := make(map[string]bool)
+		found := map[string]bool{}
 		for _, bind := range srvs {
 			name := bind.Endpoint.GetName()
 			if !found[name] {
@@ -253,7 +253,7 @@ func Browse(store Store, fields ...string) http.Handler {
 		guard(500, err)
 
 		link := linker(r)
-		found := make(map[string]bool)
+		found := map[string]bool{}
 		for _, bind := range srvs {
 			child := prefix(string(bind.Job.Path()), len(fields)+2)
 			if !found[child] {

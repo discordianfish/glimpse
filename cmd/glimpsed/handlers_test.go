@@ -18,6 +18,7 @@ func init() {
 		{"Get Job", testGET},
 		{"Match", testMatch},
 		{"Browse", testBrowse},
+		{"Watch", testWatch},
 	}...)
 }
 
@@ -245,7 +246,7 @@ func testWatch(t *testing.T, store Store) {
 	go route(store).ServeHTTP(w, r)
 
 	// FIXME synchronize the long poll
-	time.Sleep(time.Millisecond)
+	time.Sleep(1000 * time.Millisecond)
 
 	if 200 != w.Code {
 		t.Fatalf("expected 200, got: %v %q", w.Code, w.Body.String())

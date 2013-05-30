@@ -39,6 +39,7 @@ type change struct {
 
 func (c change) Operation() Op     { return c.op }
 func (c change) Service() *Service { return c.srv }
+func (c change) String() string    { return string(c.op) + ": " + c.srv.String() }
 
 func (j *Job) Validate() error {
 	v := new(validationErrors)
