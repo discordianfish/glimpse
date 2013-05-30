@@ -24,6 +24,10 @@ func route(store Store) http.Handler {
 	return mux
 }
 
+func init() {
+	flag.Parse()
+}
+
 func main() {
 	store, err := newDBStore(*dsn)
 	if err != nil {
