@@ -19,6 +19,11 @@ type Change interface {
 
 type ServiceAddress string
 
+func (p ServiceAddress) Match(o ServiceAddress) bool {
+	ok, _ := path.Match(string(p), string(o))
+	return ok
+}
+
 func (p ServiceAddress) JobPath() string {
 	return path.Dir(string(p))
 }

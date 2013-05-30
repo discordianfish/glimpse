@@ -2,6 +2,7 @@ package main
 
 import (
 	"path"
+	"sort"
 	"sync"
 )
 
@@ -26,9 +27,9 @@ func (s Mem) broadcast(ch Change) {
 	addr := ch.Service().Address()
 	alive := make([]WatchFunc, 0)
 
-	for match, funcs := range s.watches {
+	for watch, funcs := range s.watches {
 		alive = alive[:0]
-		if ok, _ := path.Match(string(match), string(addr)); ok {
+		if watch.Match(addr) {
 			for _, handler := range funcs {
 				if handler(ch) {
 					alive = append(alive, handler)
@@ -38,7 +39,7 @@ func (s Mem) broadcast(ch Change) {
 
 		copy(funcs, alive)
 		funcs = funcs[:len(alive)]
-		s.watches[match] = funcs
+		s.watches[watch] = funcs
 	}
 }
 
@@ -102,6 +103,8 @@ func (s Mem) Match(glob ServiceAddress, watch WatchFunc) ([]Service, error) {
 	if watch != nil {
 		s.listen(glob, watch)
 	}
+
+	sort.Sort(ServiceGroup(srvs))
 
 	return srvs, nil
 }

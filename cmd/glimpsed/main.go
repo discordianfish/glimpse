@@ -25,5 +25,10 @@ func route(store Store) http.Handler {
 }
 
 func main() {
-	log.Fatal(http.ListenAndServe(*addr, guarded(route(newMemStore()))))
+	store, err := newDBStore(*dsn)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Fatal(http.ListenAndServe(*addr, guarded(route(store))))
 }

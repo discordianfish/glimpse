@@ -6,6 +6,8 @@ import (
 
 type Path string
 
+func (p Path) String() string { return string(p) }
+
 func (p Path) Parts() (zone string, product string, env string, name string) {
 	parts := strings.Split(string(p), "/")
 	if len(parts) > 1 {

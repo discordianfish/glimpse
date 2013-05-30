@@ -12,6 +12,15 @@ import (
 	"code.google.com/p/goprotobuf/proto"
 )
 
+func init() {
+	tests = append(tests, []acceptanceTest{
+		{"Put Job", testPUT},
+		{"Get Job", testGET},
+		{"Match", testMatch},
+		{"Browse", testBrowse},
+	}...)
+}
+
 func pb(m proto.Message) *bytes.Buffer {
 	body, err := proto.Marshal(m)
 	if err != nil {
@@ -56,8 +65,7 @@ func testReq(method, path string, body io.Reader, headers map[string]string) (*h
 	return r, httptest.NewRecorder()
 }
 
-func TestPUT(t *testing.T) {
-	store := newMemStore()
+func testPUT(t *testing.T, store Store) {
 	job := testJob("an", "site", "prod", "api", []*Instance{
 		testInstance(0, nil),
 	})
@@ -77,8 +85,7 @@ func TestPUT(t *testing.T) {
 	}
 }
 
-func TestJobGET(t *testing.T) {
-	store := newMemStore()
+func testGET(t *testing.T, store Store) {
 	job := testJob("an", "site", "prod", "api", []*Instance{
 		testInstance(0, nil),
 	})
@@ -118,9 +125,7 @@ func shouldMatch(t *testing.T, h http.Handler, path string, bodyParts ...string)
 	}
 }
 
-func TestMatch(t *testing.T) {
-	store := newMemStore()
-
+func testMatch(t *testing.T, store Store) {
 	store.Put(Ref{testJob("an", "site", "prod", "api", []*Instance{
 		testInstance(0, []*Endpoint{
 			testEndpoint("http", "host", 8080),
@@ -161,9 +166,7 @@ func TestMatch(t *testing.T) {
 		"/an/site/prod/worker/0:http host:8080\n")
 }
 
-func TestBrowse(t *testing.T) {
-	store := newMemStore()
-
+func testBrowse(t *testing.T, store Store) {
 	store.Put(Ref{testJob("an", "site", "prod", "api", []*Instance{
 		testInstance(0, []*Endpoint{
 			testEndpoint("http", "host", 8080),
@@ -186,8 +189,8 @@ func TestBrowse(t *testing.T) {
 	h := route(store)
 
 	shouldMatch(t, h, "/an",
-		"/an/site\n",
-		"/an/extra\n")
+		"/an/extra\n",
+		"/an/site\n")
 
 	shouldMatch(t, h, "/an/site",
 		"/an/site/prod\n")
@@ -215,9 +218,7 @@ func shouldStreamMessage(t *testing.T, buf *bytes.Buffer, lines ...string) {
 	buf.Reset()
 }
 
-func TestWatch(t *testing.T) {
-	store := newMemStore()
-
+func testWatch(t *testing.T, store Store) {
 	store.Put(Ref{testJob("an", "site", "prod", "api", []*Instance{
 		testInstance(0, []*Endpoint{
 			testEndpoint("http", "host", 8080),
