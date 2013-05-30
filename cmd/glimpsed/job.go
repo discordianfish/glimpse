@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"path"
 	"regexp"
 	"sort"
 	"strings"
@@ -13,43 +12,6 @@ import (
 )
 
 var label = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
-
-type ServiceAddress string
-
-func (p ServiceAddress) JobPath() string {
-	return path.Dir(string(p))
-}
-
-type Service struct {
-	*Job
-	*Instance
-	*Endpoint
-}
-
-func (s Service) Address() ServiceAddress {
-	return ServiceAddress(fmt.Sprintf("/%s/%s/%s/%s/%d:%s",
-		s.Job.GetZone(),
-		s.Job.GetProduct(),
-		s.Job.GetEnv(),
-		s.Job.GetName(),
-		s.Instance.GetIndex(),
-		s.Endpoint.GetName(),
-	))
-}
-
-func (s Service) String() string {
-	return fmt.Sprintf("%s %s:%d",
-		s.Address(),
-		s.Endpoint.GetHost(),
-		s.Endpoint.GetPort(),
-	)
-}
-
-type ServiceGroup []Service
-
-func (g ServiceGroup) Less(i, j int) bool { return g[i].String() < g[j].String() }
-func (g ServiceGroup) Swap(i, j int)      { g[i], g[j] = g[j], g[i] }
-func (g ServiceGroup) Len() int           { return len(g) }
 
 type validationErrors []string
 
@@ -70,6 +32,14 @@ func (v *validationErrors) Result() error {
 	return *v
 }
 
+type change struct {
+	op  Op
+	srv *Service
+}
+
+func (c change) Operation() Op     { return c.op }
+func (c change) Service() *Service { return c.srv }
+
 func (j *Job) Validate() error {
 	v := new(validationErrors)
 
@@ -82,10 +52,11 @@ func (j *Job) Validate() error {
 }
 
 func (j *Job) Services() []Service {
-	var sg ServiceGroup
 	if j == nil {
 		return []Service{}
 	}
+
+	var sg ServiceGroup
 
 	for _, instance := range j.GetInstance() {
 		for _, endpoint := range instance.GetEndpoint() {
@@ -100,6 +71,36 @@ func (j *Job) Services() []Service {
 
 	sort.Sort(sg)
 	return sg
+}
+
+func (old *Job) Diff(new *Job) []Change {
+	var cs []Change
+
+	olds := old.Services()
+	news := new.Services()
+
+	var i, j int
+	for i < len(olds) && j < len(news) {
+		switch {
+		case olds[i].String() < news[j].String():
+			cs = append(cs, change{Del, &olds[i]})
+			i++
+		case olds[i].String() > news[j].String():
+			cs = append(cs, change{Add, &olds[i]})
+			j++
+		default:
+			i++
+			j++
+		}
+	}
+	for ; i < len(olds); i++ {
+		cs = append(cs, change{Del, &olds[i]})
+	}
+	for ; j < len(news); j++ {
+		cs = append(cs, change{Add, &news[i]})
+	}
+
+	return cs
 }
 
 func DecodeJob(r io.Reader) (*Job, error) {

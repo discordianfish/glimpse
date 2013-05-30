@@ -30,6 +30,6 @@ func guarded(h http.Handler) http.Handler {
 			}
 		}()
 
-		h.ServeHTTP(w,r)
+		h.ServeHTTP(w, r)
 	})
 }

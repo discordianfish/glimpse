@@ -5,37 +5,6 @@ import (
 	"sync"
 )
 
-type Op string
-
-const (
-	Add Op = "add"
-	Del Op = "del"
-)
-
-type Change interface {
-	Operation() Op
-	Service() *Service
-}
-
-type Ref struct {
-	*Job
-	Rev int64
-}
-
-type Store interface {
-	Put(Ref) (Ref, error)
-	Get(Path) (*Ref, error)
-	Match(ServiceAddress, WatchFunc) ([]Service, error)
-}
-
-type change struct {
-	op  Op
-	srv *Service
-}
-
-func (c change) Operation() Op     { return c.op }
-func (c change) Service() *Service { return c.srv }
-
 type Mem struct {
 	m       sync.RWMutex
 	jobs    map[Path]*Job
@@ -75,28 +44,8 @@ func (s Mem) broadcast(ch Change) {
 
 // Holds write lock
 func (s Mem) notify(del, add *Job) {
-	dels := del.Services()
-	adds := add.Services()
-
-	var i, j int
-	for i < len(dels) && j < len(adds) {
-		switch {
-		case dels[i].String() < adds[j].String():
-			s.broadcast(change{Del, &dels[i]})
-			i++
-		case dels[i].String() > adds[j].String():
-			s.broadcast(change{Add, &dels[i]})
-			j++
-		default:
-			i++
-			j++
-		}
-	}
-	for ; i < len(dels); i++ {
-		s.broadcast(change{Del, &dels[i]})
-	}
-	for ; j < len(adds); j++ {
-		s.broadcast(change{Add, &adds[i]})
+	for _, c := range del.Diff(add) {
+		s.broadcast(c)
 	}
 }
 
@@ -128,8 +77,6 @@ func (s Mem) Get(path Path) (*Ref, error) {
 	defer s.m.RUnlock()
 	return &Ref{s.jobs[path], s.rev}, nil
 }
-
-type WatchFunc func(Change) bool
 
 func (s Mem) Match(glob ServiceAddress, watch WatchFunc) ([]Service, error) {
 	s.m.Lock()
