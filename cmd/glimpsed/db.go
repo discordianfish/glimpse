@@ -48,7 +48,7 @@ func newDBStore(dsn string) (*db, error) {
 		return nil, fmt.Errorf("failed to open database: %v", err)
 	}
 
-	return &db{db: conn}, nil
+	return &db{db: conn}, conn.Ping()
 }
 
 func (s db) ensureSchema() error {
