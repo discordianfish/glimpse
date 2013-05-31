@@ -122,9 +122,9 @@ func requestToGlob(r *http.Request) glob {
 	}
 
 	g.endpoint = q.Get(":endpoint")
-	if len(g.endpoint) > 0 {
-		// FIXME stripping colon from this param is a bug in the 'pat' router
-		g.endpoint = g.endpoint[1:len(g.endpoint)]
+	if len(g.endpoint) > 0 && g.endpoint[0] == ':' {
+		// the `pat` router keeps the leading colon in double colon patterns
+		g.endpoint = g.endpoint[1:]
 	}
 	if g.endpoint == "" {
 		g.endpoint = "*"
