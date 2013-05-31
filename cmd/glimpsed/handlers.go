@@ -1,11 +1,19 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"path"
 	"strings"
+	"time"
+)
+
+var heartbeatInterval = flag.Duration(
+	"heartbeat",
+	20*time.Second,
+	"interval between event-stream comment messages during watches",
 )
 
 func validateJobPath(path Path, job *Job) error {
@@ -135,53 +143,69 @@ func MatchOrWatch(match, watch http.Handler) http.Handler {
 	})
 }
 
-func flush(w interface{}) {
-	if f, ok := w.(http.Flusher); ok {
-		f.Flush()
-	}
-}
-
-func writeSetEvent(w io.Writer, services []Service) {
+func streamSetEvent(w io.Writer, services []Service) {
 	fmt.Fprint(w, "event: set\n")
 	for _, srv := range services {
 		fmt.Fprintf(w, "data: %s\n", srv.String())
 	}
 	fmt.Fprint(w, "\n")
-	flush(w)
 }
 
-func writeChangeEvent(w io.Writer, c Change) error {
+func streamChangeEvent(w io.Writer, c Change) error {
 	if _, err := fmt.Fprintf(w, "event: %s\n", c.Operation()); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprintf(w, "data: %s\n\n", c.Service().String()); err != nil {
 		return err
 	}
+	return nil
+}
 
-	flush(w)
+func streamComment(w io.Writer, c string) error {
+	if _, err := fmt.Fprintf(w, ": %s\n", c); err != nil {
+		return err
+	}
 	return nil
 }
 
 func Watch(store Store) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		glob := requestToGlob(r)
-		changes := make(chan Change)
 
+		heartbeat := time.Tick(*heartbeatInterval)
+
+		changes := make(chan Change, 1)
 		more := make(chan bool)
-		defer close(more)
+		defer close(more) // terminates watcher
 
-		services, err := store.Match(glob.ServiceAddress(), func(c Change) bool {
+		listen := func(c Change) bool {
 			changes <- c
 			return <-more
-		})
+		}
+
+		services, err := store.Match(glob.ServiceAddress(), listen)
 		guard(500, err)
 
-		writeSetEvent(w, services)
-		for c := range changes {
-			if err := writeChangeEvent(w, c); err != nil {
-				return
+		streamSetEvent(w, services)
+
+		for {
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
 			}
-			more <- true
+
+			select {
+			case more <- true:
+
+			case <-heartbeat:
+				if streamComment(w, "") != nil {
+					return
+				}
+
+			case c := <-changes:
+				if streamChangeEvent(w, c) != nil {
+					return
+				}
+			}
 		}
 	})
 }
