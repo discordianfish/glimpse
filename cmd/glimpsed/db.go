@@ -50,7 +50,7 @@ type dbWatch struct {
 	glob     ServiceAddress
 	rev      int64
 	callback WatchFunc
-	jobs     []*Job
+	jobs     map[Path]*Job
 }
 
 func newDBStore(dsn string) (*db, error) {
@@ -151,21 +151,21 @@ func byPath(jobs []*Job) map[Path]*Job {
 	return m
 }
 
-func diff(olds []*Job, updates []*Job) []Change {
+func saveChanges(replicas map[Path]*Job, updates map[Path]*Job) []Change {
 	changes := []Change{}
 
-	oldMap := byPath(olds)
-	newMap := byPath(updates)
-
-	for path, old := range oldMap {
-		if updated := newMap[path]; updated != nil {
+	for path, old := range replicas {
+		if updated := updates[path]; updated != nil {
 			changes = append(changes, (*Job).Diff(old, updated)...)
-			delete(newMap, path)
+			replicas[path] = updated
 		}
 	}
 
-	for _, add := range newMap {
-		changes = append(changes, (*Job).Diff(nil, add)...)
+	for path, add := range updates {
+		if replicas[path] == nil {
+			changes = append(changes, (*Job).Diff(nil, add)...)
+			replicas[path] = add
+		}
 	}
 
 	return changes
@@ -173,10 +173,11 @@ func diff(olds []*Job, updates []*Job) []Change {
 
 func (s *db) sync() {
 	for {
-		// Keeps the config in the session
+		// Keeps the long_query_time pinned to this session
 		err := s.tx(func(tx *sql.Tx) error {
 			s.db.Exec(`set session long_query_time=61`)
 			defer s.db.Exec(`set session long_query_time=DEFAULT`)
+
 			if _, err := s.db.Exec(`do sleep('60 ` + waitCondition + `')`); err != nil {
 				return err
 			}
@@ -200,19 +201,17 @@ func (s *db) sync() {
 			keepers:
 				for _, ws := range s.watches {
 					jobs, nextRev, err := s.jobs(ws.glob.JobPath(), ws.rev)
-					fmt.Println(ws.glob, ws.rev, nextRev, diff(ws.jobs, jobs))
 					if err != nil {
 						continue keepers
 					}
 
-					for _, ch := range diff(ws.jobs, jobs) {
+					for _, ch := range saveChanges(ws.jobs, byPath(jobs)) {
 						if !ws.callback(ch) {
 							continue keepers
 						}
 					}
 
 					// record the state we've seen up until now
-					ws.jobs = jobs
 					ws.rev = nextRev
 
 					keep = append(keep, ws)
@@ -376,7 +375,7 @@ func (s *db) Match(glob ServiceAddress, watch WatchFunc) ([]Service, error) {
 	}
 
 	if watch != nil {
-		s.listen(&dbWatch{glob, max, watch, jobs})
+		s.listen(&dbWatch{glob, max, watch, byPath(jobs)})
 	}
 
 	return services(glob, jobs), nil
