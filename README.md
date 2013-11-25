@@ -6,16 +6,6 @@ Service directory for active & passive discovery on top of doozerd[3].
 [2]: http://travis-ci.org/soundcloud/glimpse
 [3]: https://github.com/ha/doozerd
 
-
-## Documentation
-
-We have a pretty good user documentation [here](http://go/service-discovery)
-and some introduction slides [here](http://go/sd-slides).
-
-See [the gopkgdoc page](http://gopkgdoc.appspot.com/github.com/soundcloud/glimpse)
-for up-to-the-minute documentation and usage.
-
-
 ## Installing
 
 Install [Go 1][4], either [from source][5] or [with a prepackaged binary][6].
@@ -28,6 +18,10 @@ $ go get github.com/soundcloud/glimpse
 [4]: http://golang.org
 [5]: http://golang.org/doc/install/source
 [6]: http://golang.org/doc/install
+
+## Documentation
+
+See [the gopkgdoc page](http://gopkgdoc.appspot.com/github.com/soundcloud/glimpse) for up-to-the-minute documentation and usage.
 
 ## Contributing
 
