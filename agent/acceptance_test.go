@@ -36,16 +36,13 @@ var config = []byte(`
 `)
 
 func TestAll(t *testing.T) {
-	// TODO(alx): Account for missing env variable.
-	buildDir := os.Getenv("BUILD_DIR")
-
-	configDir, err := ioutil.TempDir(buildDir, "config")
+	configDir, err := ioutil.TempDir("", "config")
 	if err != nil {
 		t.Fatalf("failed to create consul data dir: %s", err)
 	}
 	defer os.RemoveAll(configDir)
 
-	dataDir, err := ioutil.TempDir(buildDir, "data")
+	dataDir, err := ioutil.TempDir("", "data")
 	if err != nil {
 		t.Fatalf("failed to create consul data dir: %s", err)
 	}
