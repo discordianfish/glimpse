@@ -1,18 +1,14 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"net/http"
-	"net/url"
 	"os"
 	"regexp"
 	"strings"
 
-	consul "github.com/hashicorp/consul/consul/structs"
+	"github.com/armon/consul-api"
 	"github.com/miekg/dns"
 )
 
@@ -48,15 +44,26 @@ func main() {
 	log.SetFlags(log.Lmicroseconds | log.Lshortfile)
 	log.SetOutput(os.Stdout)
 
-	server := &dns.Server{Addr: *udpAddr, Net: "udp"}
+	consul, err := consulapi.NewClient(&consulapi.Config{
+		Address:    *consulAddr,
+		Datacenter: *srvZone,
+	})
+	if err != nil {
+		log.Fatalf("consul connection failed: %s", err)
+	}
 
-	dns.HandleFunc(".", handleRequest(*consulAddr, *srvZone, *srvDomain))
+	server := &dns.Server{
+		Addr: *udpAddr,
+		Net:  "udp",
+	}
+
+	dns.HandleFunc(".", handleRequest(consul, *srvZone, *srvDomain))
 
 	log.Printf("glimpse-agent started on %s\n", *udpAddr)
 	log.Fatalf("dns failed: %s", server.ListenAndServe())
 }
 
-func handleRequest(consulAddr, zone, domain string) dns.HandlerFunc {
+func handleRequest(consul *consulapi.Client, zone, domain string) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, req *dns.Msg) {
 		var (
 			q   = req.Question[0]
@@ -84,11 +91,46 @@ func handleRequest(consulAddr, zone, domain string) dns.HandlerFunc {
 				break
 			}
 
-			nodes, err := consulLookup(l, consulAddr)
+			var (
+				tag     = fmt.Sprintf("glimpse:job=%s", l.job)
+				options = &consulapi.QueryOptions{
+					AllowStale: true,
+					Datacenter: l.zone,
+				}
+			)
+
+			allNodes, meta, err := consul.Catalog().Service(l.product, tag, options)
 			if err != nil {
-				log.Printf("err: consul lookup '%s': %s", q.Name, err)
-				res.SetRcode(req, dns.RcodeServerFailure)
-				break
+				log.Fatalf("nodes lookup failed: %s", err)
+			}
+
+			log.Printf(
+				"consul lookup of %s.*.%s took %dns\n",
+				l.product,
+				l.job,
+				meta.RequestTime.Nanoseconds(),
+			)
+
+			nodes := []*consulapi.CatalogService{}
+
+			for _, node := range allNodes {
+				var (
+					isEnv     bool
+					isService bool
+				)
+
+				for _, tag := range node.ServiceTags {
+					if tag == fmt.Sprintf("glimpse:env=%s", l.env) {
+						isEnv = true
+					}
+					if tag == fmt.Sprintf("glimpse:service=%s", l.service) {
+						isService = true
+					}
+				}
+
+				if isEnv && isService {
+					nodes = append(nodes, node)
+				}
 			}
 
 			for _, n := range nodes {
@@ -116,64 +158,6 @@ func handleRequest(consulAddr, zone, domain string) dns.HandlerFunc {
 		}
 
 		log.Printf("query: %s %s -> %d\n", dns.TypeToString[q.Qtype], q.Name, len(res.Answer))
-	}
-}
-
-func consulLookup(l srvInfo, addr string) ([]consul.ServiceNode, error) {
-	var (
-		eps   = []consul.ServiceNode{}
-		nodes = []consul.ServiceNode{}
-		vs    = url.Values{}
-	)
-
-	vs.Set("dc", l.zone)
-	vs.Set("tag", fmt.Sprintf("glimpse:job=%s", l.job))
-
-	url := fmt.Sprintf("http://%s/v1/catalog/service/%s?%s", addr, l.product, vs.Encode())
-
-	res, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	switch res.StatusCode {
-	case http.StatusOK:
-		err = json.NewDecoder(res.Body).Decode(&nodes)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, node := range nodes {
-			var (
-				isEnv     bool
-				isService bool
-			)
-
-			for _, tag := range node.ServiceTags {
-				if tag == fmt.Sprintf("glimpse:env=%s", l.env) {
-					isEnv = true
-				}
-				if tag == fmt.Sprintf("glimpse:service=%s", l.service) {
-					isService = true
-				}
-			}
-
-			if isEnv && isService {
-				eps = append(eps, node)
-			}
-		}
-
-		return eps, nil
-	case http.StatusInternalServerError:
-		return nil, fmt.Errorf("zone not known")
-	default:
-		body, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			return nil, err
-		}
-
-		return nil, fmt.Errorf("unexpected response %s\n%s\n", res.Status, string(body))
 	}
 }
 
