@@ -98,74 +98,13 @@ func TestAll(t *testing.T) {
 	}
 }
 
-func terminateCommand(cmd *exec.Cmd) {
-	err := syscall.Kill(cmd.Process.Pid, syscall.SIGTERM)
-	if err != nil {
-		panic(err)
-	}
-}
-
 func runAgent() (*exec.Cmd, error) {
 	args := []string{
 		"-srv.zone", "cz",
 		"-udp.addr", ":5959",
 	}
-	cmd := exec.Command(".deps/glimpse-agent", args...)
-	out, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
 
-	var (
-		linec = make(chan string)
-		errc  = make(chan error)
-	)
-
-	// TODO(alx): Better coordination of routines and proper shutdown.
-	go func(out io.ReadCloser, linec chan string, errc chan error) {
-		reader := bufio.NewReader(out)
-		for {
-			line, _, err := reader.ReadLine()
-			if err != nil {
-				if err == io.EOF {
-					continue
-				}
-				if _, ok := err.(*os.PathError); ok {
-					return
-				}
-				errc <- err
-			}
-			linec <- string(line)
-		}
-	}(out, linec, errc)
-
-	err = cmd.Start()
-	if err != nil {
-		return nil, err
-	}
-
-	go func(cmd *exec.Cmd, errc chan error) {
-		errc <- cmd.Wait()
-	}(cmd, errc)
-
-	var lastLine string
-
-	for {
-		select {
-		case line := <-linec:
-			lastLine = line
-
-			if strings.Contains(line, "glimpse-agent started") {
-				return cmd, nil
-			}
-		case err := <-errc:
-			if err != nil {
-				return nil, fmt.Errorf("%s: %s", err, lastLine)
-			}
-		case <-time.After(5 * time.Second):
-			return nil, fmt.Errorf("glimpse-agent startup timed out: %s", lastLine)
-		}
-	}
+	return runCommand(".deps/glimpse-agent", args, "glimpse-agent started")
 }
 
 func runConsul(configDir, dataDir string) (*exec.Cmd, error) {
@@ -178,7 +117,11 @@ func runConsul(configDir, dataDir string) (*exec.Cmd, error) {
 		"-data-dir", dataDir,
 	}
 
-	cmd := exec.Command(".deps/consul", args...)
+	return runCommand(".deps/consul", args, "Synced service 'goku")
+}
+
+func runCommand(name string, args []string, success string) (*exec.Cmd, error) {
+	cmd := exec.Command(name, args...)
 	out, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -223,7 +166,7 @@ func runConsul(configDir, dataDir string) (*exec.Cmd, error) {
 		case line := <-linec:
 			lastLine = line
 
-			if strings.Contains(line, "Synced service 'goku") {
+			if strings.Contains(line, success) {
 				return cmd, nil
 			}
 		case err := <-errc:
@@ -231,7 +174,14 @@ func runConsul(configDir, dataDir string) (*exec.Cmd, error) {
 				return nil, fmt.Errorf("%s: %s", err, lastLine)
 			}
 		case <-time.After(5 * time.Second):
-			return nil, fmt.Errorf("consul startup timed out: %s", lastLine)
+			return nil, fmt.Errorf("% startup timed out: %s", name, lastLine)
 		}
+	}
+}
+
+func terminateCommand(cmd *exec.Cmd) {
+	err := syscall.Kill(cmd.Process.Pid, syscall.SIGTERM)
+	if err != nil {
+		panic(err)
 	}
 }
