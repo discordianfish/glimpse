@@ -22,15 +22,15 @@ $(DEPS_DIR):
 
 # TODO(alx): Move to tar base distribution.
 $(DEPS_DIR)/$(CONSUL_ZIP):
-	wget $(CONSUL_URL) -O $@
+	wget --quiet $(CONSUL_URL) -O $@
 
 $(AGENT_BIN): *.go
 	go get -d ./...
 	go build -o $@
 
 $(CONSUL_BIN): $(DEPS_DIR)/$(CONSUL_ZIP)
-	unzip -d $(DEPS_DIR) $<
-	touch $@
+	unzip -q -d $(DEPS_DIR) $<
+	@touch $@
 
 # TODO(alx): Fix dependencies.
 .PHONY: acceptance-test
