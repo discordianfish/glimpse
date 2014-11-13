@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/armon/consul-api"
+	"github.com/miekg/dns"
 )
 
 var config = []byte(`
@@ -41,7 +41,7 @@ func TestAll(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create consul data dir: %s", err)
 	}
-	// defer os.RemoveAll(configDir)
+	defer os.RemoveAll(configDir)
 
 	dataDir, err := ioutil.TempDir(buildDir, "data")
 	if err != nil {
@@ -58,32 +58,117 @@ func TestAll(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consul failed: %s", err)
 	}
+	defer terminateCommand(consul)
 
-	defer func(consul *exec.Cmd) {
-		err := syscall.Kill(consul.Process.Pid, syscall.SIGTERM)
-		if err != nil {
-			panic(err)
+	agent, err := runAgent()
+	if err != nil {
+		t.Fatalf("agent failed: %s", err)
+	}
+	defer terminateCommand(agent)
+
+	c := &dns.Client{}
+	m := &dns.Msg{}
+
+	m.SetQuestion("http.stream.prod.goku.", dns.TypeSRV)
+
+	res, _, err := c.Exchange(m, "127.0.0.1:5959")
+	if err != nil {
+		t.Fatalf("DNS lookup failed: %s", err)
+	}
+
+	if len(res.Answer) != 1 {
+		t.Fatalf("expected 1 DNS result, got %d", len(res.Answer))
+	}
+
+	var (
+		hdr      = res.Answer[0].Header()
+		expected = "http.stream.prod.goku."
+		got      = hdr.Name
+	)
+
+	if expected != got {
+		t.Fatalf("expected '%s', got '%s'", expected, got)
+	}
+
+	expected = dns.TypeToString[dns.TypeSRV]
+	got = dns.TypeToString[hdr.Rrtype]
+
+	if expected != got {
+		t.Fatalf("expected '%s', got '%s'", expected, got)
+	}
+}
+
+func terminateCommand(cmd *exec.Cmd) {
+	err := syscall.Kill(cmd.Process.Pid, syscall.SIGTERM)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func runAgent() (*exec.Cmd, error) {
+	args := []string{
+		"-srv.zone", "cz",
+		"-udp.addr", ":5959",
+	}
+	cmd := exec.Command(".deps/glimpse-agent", args...)
+	out, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		linec = make(chan string)
+		errc  = make(chan error)
+	)
+
+	// TODO(alx): Better coordination of routines and proper shutdown.
+	go func(out io.ReadCloser, linec chan string, errc chan error) {
+		reader := bufio.NewReader(out)
+		for {
+			line, _, err := reader.ReadLine()
+			if err != nil {
+				if err == io.EOF {
+					continue
+				}
+				if _, ok := err.(*os.PathError); ok {
+					return
+				}
+				errc <- err
+			}
+			linec <- string(line)
 		}
-	}(consul)
+	}(out, linec, errc)
 
-	client, err := consulapi.NewClient(consulapi.DefaultConfig())
+	err = cmd.Start()
 	if err != nil {
-		t.Fatalf("consul connection failed: %s", err)
+		return nil, err
 	}
 
-	services, err := client.Agent().Services()
-	if err != nil {
-		t.Fatalf("services failed: %s", err)
-	}
+	go func(cmd *exec.Cmd, errc chan error) {
+		errc <- cmd.Wait()
+	}(cmd, errc)
 
-	_, ok := services["goku-stream-8080"]
-	if !ok {
-		t.Fatal("service not present in agent")
+	var lastLine string
+
+	for {
+		select {
+		case line := <-linec:
+			lastLine = line
+
+			if strings.Contains(line, "glimpse-agent started") {
+				return cmd, nil
+			}
+		case err := <-errc:
+			if err != nil {
+				return nil, fmt.Errorf("%s: %s", err, lastLine)
+			}
+		case <-time.After(5 * time.Second):
+			return nil, fmt.Errorf("glimpse-agent startup timed out: %s", lastLine)
+		}
 	}
 }
 
 func runConsul(configDir, dataDir string) (*exec.Cmd, error) {
-
 	args := []string{
 		"agent",
 		"-server",

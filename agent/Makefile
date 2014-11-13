@@ -5,6 +5,8 @@ OS		:=	$(subst Darwin,darwin,$(subst Linux,linux,$(shell uname)))
 BUILD_DIR := .build
 DEPS_DIR 	:= .deps
 
+AGENT_BIN := $(DEPS_DIR)/glimpse-agent
+
 CONSUL_BIN := $(DEPS_DIR)/consul
 CONSUL_VER := 0.4.1
 CONSUL_ZIP :=	$(CONSUL_VER)_$(OS)_$(ARCH).zip
@@ -19,23 +21,27 @@ $(DEPS_DIR):
 	mkdir -p $(DEPS_DIR)
 
 # TODO(alx): Move to tar base distribution.
-$(DEPS_DIR)/$(CONSUL_ZIP): $(DEPS_DIR)
+$(DEPS_DIR)/$(CONSUL_ZIP):
 	wget $(CONSUL_URL) -O $@
-	touch $@
+
+$(AGENT_BIN): *.go
+	go get -d ./...
+	go build -o $@
 
 $(CONSUL_BIN): $(DEPS_DIR)/$(CONSUL_ZIP)
 	unzip -d $(DEPS_DIR) $<
 	touch $@
 
+# TODO(alx): Fix dependencies.
 .PHONY: acceptance-test
-acceptance-test: $(BUILD_DIR) $(CONSUL_BIN)
+acceptance-test: $(BUILD_DIR) $(DEPS_DIR) $(AGENT_BIN) $(CONSUL_BIN)
 	BUILD_DIR=$(BUILD_DIR) go test -v -tags acceptance
 
 .PHONY: clean
 clean:
-	rm -rf $(BUILD_DIR)
-	rm -rf $(DEPS_DIR)
-	# git clean -fdx
+	git clean -fdx
 
 .PHONY: test
 test: acceptance-test
+
+.SUFFIXES: # Disable default suffixes
