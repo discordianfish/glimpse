@@ -84,53 +84,16 @@ func handleRequest(consul *consulapi.Client, zone, domain string) dns.HandlerFun
 
 		switch q.Qtype {
 		case dns.TypeSRV:
-			l, err := extractLookup(strings.TrimSuffix(q.Name, "."), zone, domain)
+			srv, err := extractSrvInfo(strings.TrimSuffix(q.Name, "."), zone, domain)
 			if err != nil {
 				log.Printf("err: extract lookup '%s': %s", q.Name, err)
 				res.SetRcode(req, dns.RcodeServerFailure)
 				break
 			}
 
-			var (
-				tag     = fmt.Sprintf("glimpse:job=%s", l.job)
-				options = &consulapi.QueryOptions{
-					AllowStale: true,
-					Datacenter: l.zone,
-				}
-			)
-
-			allNodes, meta, err := consul.Catalog().Service(l.product, tag, options)
+			nodes, err := consulLookup(srv, consul)
 			if err != nil {
-				log.Fatalf("nodes lookup failed: %s", err)
-			}
-
-			log.Printf(
-				"consul lookup of %s.*.%s took %dns\n",
-				l.product,
-				l.job,
-				meta.RequestTime.Nanoseconds(),
-			)
-
-			nodes := []*consulapi.CatalogService{}
-
-			for _, node := range allNodes {
-				var (
-					isEnv     bool
-					isService bool
-				)
-
-				for _, tag := range node.ServiceTags {
-					if tag == fmt.Sprintf("glimpse:env=%s", l.env) {
-						isEnv = true
-					}
-					if tag == fmt.Sprintf("glimpse:service=%s", l.service) {
-						isService = true
-					}
-				}
-
-				if isEnv && isService {
-					nodes = append(nodes, node)
-				}
+				log.Fatalf("consul lookup failed: %s", err)
 			}
 
 			for _, n := range nodes {
@@ -161,7 +124,56 @@ func handleRequest(consul *consulapi.Client, zone, domain string) dns.HandlerFun
 	}
 }
 
-func extractLookup(name, zone, domain string) (srvInfo, error) {
+func consulLookup(srv srvInfo, consul *consulapi.Client) ([]*consulapi.CatalogService, error) {
+	var (
+		envTag     = fmt.Sprintf("glimpse:env=%s", srv.env)
+		jobTag     = fmt.Sprintf("glimpse:job=%s", srv.job)
+		serviceTag = fmt.Sprintf("glimpse:service=%s", srv.service)
+		options    = &consulapi.QueryOptions{
+			AllowStale: true,
+			Datacenter: srv.zone,
+		}
+
+		nodes = []*consulapi.CatalogService{}
+	)
+
+	catalog := consul.Catalog()
+	allNodes, meta, err := catalog.Service(srv.product, jobTag, options)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf(
+		"consul lookup of %s.*.%s took %dns\n",
+		srv.product,
+		srv.job,
+		meta.RequestTime.Nanoseconds(),
+	)
+
+	for _, node := range allNodes {
+		var (
+			isEnv     bool
+			isService bool
+		)
+
+		for _, tag := range node.ServiceTags {
+			if tag == envTag {
+				isEnv = true
+			}
+			if tag == serviceTag {
+				isService = true
+			}
+		}
+
+		if isEnv && isService {
+			nodes = append(nodes, node)
+		}
+	}
+
+	return nodes, nil
+}
+
+func extractSrvInfo(name, zone, domain string) (srvInfo, error) {
 	var (
 		fields = strings.SplitN(name, ".", 6)
 		l      = len(fields)
