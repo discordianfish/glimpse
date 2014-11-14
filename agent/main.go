@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"regexp"
 	"strings"
@@ -25,25 +24,6 @@ var (
 	rField  = regexp.MustCompile(`^[[:alnum:]\-]+$`)
 	rZone   = regexp.MustCompile(`^[[:alnum:]]{2}$`)
 )
-
-type srvInfo struct {
-	env     string
-	job     string
-	product string
-	service string
-	zone    string
-}
-
-type instance struct {
-	srvInfo srvInfo
-	host    string
-	ip      net.IP
-	port    uint16
-}
-
-type glimpse interface {
-	getInstances(s srvInfo) ([]*instance, error)
-}
 
 func main() {
 	var (
@@ -69,7 +49,9 @@ func main() {
 		Net:  "udp",
 	}
 
-	store := &consulStore{client}
+	store := &consulStore{
+		client: client,
+	}
 
 	dns.HandleFunc(".", handleRequest(store, *srvZone, *srvDomain))
 
@@ -77,7 +59,7 @@ func main() {
 	log.Fatalf("dns failed: %s", server.ListenAndServe())
 }
 
-func handleRequest(store glimpse, zone, domain string) dns.HandlerFunc {
+func handleRequest(store store, zone, domain string) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, req *dns.Msg) {
 		var (
 			q   = req.Question[0]
@@ -136,65 +118,6 @@ func handleRequest(store glimpse, zone, domain string) dns.HandlerFunc {
 
 		log.Printf("query: %s %s -> %d\n", dns.TypeToString[q.Qtype], q.Name, len(res.Answer))
 	}
-}
-
-type consulStore struct {
-	client *consulapi.Client
-}
-
-func (s *consulStore) getInstances(srv srvInfo) ([]*instance, error) {
-	var (
-		envTag     = fmt.Sprintf("glimpse:env=%s", srv.env)
-		jobTag     = fmt.Sprintf("glimpse:job=%s", srv.job)
-		serviceTag = fmt.Sprintf("glimpse:service=%s", srv.service)
-		options    = &consulapi.QueryOptions{
-			AllowStale: true,
-			Datacenter: srv.zone,
-		}
-
-		nodes = []*instance{}
-	)
-
-	catalog := s.client.Catalog()
-	allNodes, meta, err := catalog.Service(srv.product, jobTag, options)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Printf(
-		"consul lookup of %s.*.%s took %dns\n",
-		srv.product,
-		srv.job,
-		meta.RequestTime.Nanoseconds(),
-	)
-
-	for _, node := range allNodes {
-		var (
-			isEnv     bool
-			isService bool
-		)
-
-		for _, tag := range node.ServiceTags {
-			if tag == envTag {
-				isEnv = true
-			}
-			if tag == serviceTag {
-				isService = true
-			}
-		}
-
-		if isEnv && isService {
-			ins := &instance{
-				srvInfo: srv,
-				host:    node.Address,
-				ip:      net.ParseIP(node.Node),
-				port:    uint16(node.ServicePort),
-			}
-			nodes = append(nodes, ins)
-		}
-	}
-
-	return nodes, nil
 }
 
 func extractSrvInfo(name, zone, domain string) (srvInfo, error) {
