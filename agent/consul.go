@@ -17,7 +17,7 @@ func newConsulStore(client *consulapi.Client) store {
 	}
 }
 
-func (s *consulStore) getInstances(info srvInfo) (instances, error) {
+func (s *consulStore) getInstances(info info) (instances, error) {
 	var (
 		envTag     = fmt.Sprintf("glimpse:env=%s", info.env)
 		jobTag     = fmt.Sprintf("glimpse:job=%s", info.job)
@@ -63,7 +63,7 @@ func (s *consulStore) getInstances(info srvInfo) (instances, error) {
 	return is, nil
 }
 
-func infoToTags(info srvInfo) []string {
+func infoToTags(info info) []string {
 	return []string{
 		fmt.Sprintf("glimpse:env=%s", info.env),
 		fmt.Sprintf("glimpse:job=%s", info.job),

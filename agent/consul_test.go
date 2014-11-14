@@ -11,8 +11,8 @@ import (
 )
 
 type test struct {
-	expected int
-	input    []*consulapi.CatalogService
+	want  int
+	input []*consulapi.CatalogService
 }
 
 func TestConsulGetInstances(t *testing.T) {
@@ -32,21 +32,21 @@ func TestConsulGetInstances(t *testing.T) {
 		t.Fatalf("consul connection failed: %s", err)
 	}
 
-	info := srvInfo{
+	i := info{
 		env:     "qa",
 		job:     "walker",
 		product: "roshi",
 		service: "http",
 	}
-	testSet := map[srvInfo]test{
-		info: test{
-			expected: 1,
+	testSet := map[info]test{
+		i: test{
+			want: 1,
 			input: []*consulapi.CatalogService{
 				&consulapi.CatalogService{
 					Node:        "host00.gg.local",
 					Address:     "10.2.3.4",
 					ServiceID:   "roshi-walker-8080",
-					ServiceTags: infoToTags(info),
+					ServiceTags: infoToTags(i),
 					ServicePort: 8080,
 				},
 			},
@@ -67,8 +67,8 @@ func TestConsulGetInstances(t *testing.T) {
 		if err != nil {
 			t.Fatalf("getInstances failed: %s", err)
 		}
-		if test.expected != len(is) {
-			t.Errorf("expected %d instances, got %d", test.expected, len(is))
+		if want, got := test.want, len(is); want != got {
+			t.Errorf("want %d instances, got %d", want, got)
 		}
 	}
 }

@@ -59,7 +59,7 @@ func main() {
 	log.Fatalf("dns failed: %s", server.ListenAndServe())
 }
 
-func extractSrvInfo(name, zone, domain string) (srvInfo, error) {
+func extractSrvInfo(name, zone, domain string) (info, error) {
 	var (
 		fields = strings.SplitN(name, ".", 6)
 		l      = len(fields)
@@ -67,7 +67,7 @@ func extractSrvInfo(name, zone, domain string) (srvInfo, error) {
 
 	switch {
 	case l < 4: // Misses some information
-		return srvInfo{}, fmt.Errorf("the name is invalid")
+		return info{}, fmt.Errorf("the name is invalid")
 	case l == 5: // zone is present: service.job.env.product.zone
 		zone = fields[4]
 	case l == 6:
@@ -83,25 +83,25 @@ func extractSrvInfo(name, zone, domain string) (srvInfo, error) {
 	)
 
 	if !rDomain.MatchString(domain) {
-		return srvInfo{}, fmt.Errorf("domain %q is invalid", domain)
+		return info{}, fmt.Errorf("domain %q is invalid", domain)
 	}
 	if !rZone.MatchString(zone) {
-		return srvInfo{}, fmt.Errorf("zone %q is invalid", zone)
+		return info{}, fmt.Errorf("zone %q is invalid", zone)
 	}
 	if !rField.MatchString(product) {
-		return srvInfo{}, fmt.Errorf("product %q is invalid", product)
+		return info{}, fmt.Errorf("product %q is invalid", product)
 	}
 	if !rField.MatchString(env) {
-		return srvInfo{}, fmt.Errorf("env %q is invalid", env)
+		return info{}, fmt.Errorf("env %q is invalid", env)
 	}
 	if !rField.MatchString(job) {
-		return srvInfo{}, fmt.Errorf("job %q is invalid", job)
+		return info{}, fmt.Errorf("job %q is invalid", job)
 	}
 	if !rField.MatchString(service) {
-		return srvInfo{}, fmt.Errorf("service %q is invalid", service)
+		return info{}, fmt.Errorf("service %q is invalid", service)
 	}
 
-	return srvInfo{
+	return info{
 		env:     env,
 		job:     job,
 		product: product,

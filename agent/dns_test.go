@@ -11,13 +11,13 @@ import (
 func TestDNSHandler(t *testing.T) {
 	var (
 		s = &testStore{}
-		h = dnsHandler(s, "tt", "srv.glimpe.io")
+		h = dnsHandler(s, "tt", "srv.glimpse.io")
 		w = &testWriter{}
 	)
 
 	s.instances = []*instance{
 		{
-			info: srvInfo{
+			info: info{
 				service: "http",
 				job:     "api",
 				env:     "prod",
@@ -36,11 +36,11 @@ func TestDNSHandler(t *testing.T) {
 	r := w.msg
 
 	if want, got := dns.RcodeSuccess, m.Rcode; want != got {
-		t.Errorf("expected %d rcode, got %d\n", want, got)
+		t.Errorf("want %d rcode, got %d\n", want, got)
 	}
 
 	if want, got := 1, len(r.Answer); want != got {
-		t.Errorf("expected %d answers, got %d\n", want, got)
+		t.Errorf("want %d answers, got %d\n", want, got)
 	}
 }
 
@@ -49,7 +49,7 @@ type testStore struct {
 	instances []*instance
 }
 
-func (s *testStore) getInstances(srv srvInfo) (instances, error) {
+func (s *testStore) getInstances(srv info) (instances, error) {
 	var r instances
 
 	for _, i := range s.instances {

@@ -3,7 +3,7 @@ package main
 import "net"
 
 type instance struct {
-	info srvInfo
+	info info
 	host string
 	ip   net.IP
 	port uint16
@@ -12,10 +12,10 @@ type instance struct {
 type instances []*instance
 
 type store interface {
-	getInstances(srvInfo) (instances, error)
+	getInstances(info) (instances, error)
 }
 
-type srvInfo struct {
+type info struct {
 	env      string
 	job      string
 	product  string
