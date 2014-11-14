@@ -17,7 +17,13 @@ func TestDNSHandler(t *testing.T) {
 
 	s.instances = []*instance{
 		{
-			srvInfo{"http", "api", "prod", "harpoon", "tt"},
+			srvInfo{
+				service: "http",
+				job:     "api",
+				env:     "prod",
+				product: "harpoon",
+				zone:    "tt",
+			},
 			"localhost",
 			net.ParseIP("127.0.0.1"),
 			uint16(12345),
