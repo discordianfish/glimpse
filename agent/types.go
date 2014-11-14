@@ -12,7 +12,7 @@ type instance struct {
 type instances []*instance
 
 type store interface {
-	getInstances(s srvInfo) (instances, error)
+	getInstances(srvInfo) (instances, error)
 }
 
 type srvInfo struct {

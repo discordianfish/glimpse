@@ -30,14 +30,20 @@ $(CONSUL_BIN): $(DEPS_DIR)/$(CONSUL_ZIP)
 
 # TODO(alx): Fix dependencies.
 .PHONY: acceptance-test
-acceptance-test: $(BUILD_DIR) $(DEPS_DIR) $(AGENT_BIN) $(CONSUL_BIN)
+acceptance-test: $(DEPS_DIR) $(AGENT_BIN) $(CONSUL_BIN)
 	go test -v -tags acceptance
+
+.PHONY: unit-test
+unit-test:
+	# TODO(ts): bundle dependencies
+	go get -d ./...
+	go test -v
 
 .PHONY: clean
 clean:
 	git clean -fdx
 
 .PHONY: test
-test: acceptance-test
+test: unit-test acceptance-test
 
 .SUFFIXES: # Disable default suffixes

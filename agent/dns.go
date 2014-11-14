@@ -18,7 +18,12 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 			log.Printf("warn: question > 1: %+v\n", req.Question)
 
 			for _, q := range req.Question {
-				log.Printf("warn: %s %s %s\n", dns.TypeToString[q.Qtype], dns.ClassToString[q.Qclass], q.Name)
+				log.Printf(
+					"warn: %s %s %s\n",
+					dns.TypeToString[q.Qtype],
+					dns.ClassToString[q.Qclass],
+					q.Name,
+				)
 			}
 		}
 
