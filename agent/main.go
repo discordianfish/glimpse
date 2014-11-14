@@ -7,7 +7,6 @@ import (
 	"regexp"
 
 	"github.com/armon/consul-api"
-	"github.com/miekg/dns"
 )
 
 const (
@@ -28,7 +27,7 @@ func main() {
 		consulAddr = flag.String("consul.addr", "127.0.0.1:8500", "consul lookup address")
 		srvDomain  = flag.String("srv.domain", defaultDomain, "srv lookup domain")
 		srvZone    = flag.String("srv.zone", defaultZone, "srv lookup zone")
-		udpAddr    = flag.String("udp.addr", ":5959", "udp address to bind to")
+		dnsAddr    = flag.String("dns.addr", ":5959", "DNS address to bind to")
 	)
 	flag.Parse()
 	log.SetFlags(log.Lmicroseconds | log.Lshortfile)
@@ -42,17 +41,10 @@ func main() {
 		log.Fatalf("consul connection failed: %s", err)
 	}
 
-	server := &dns.Server{
-		Addr: *udpAddr,
-		Net:  "udp",
-	}
-
 	store := &consulStore{
 		client: client,
 	}
 
-	dns.HandleFunc(".", dnsHandler(store, *srvZone, *srvDomain))
-
-	log.Printf("glimpse-agent started on %s\n", *udpAddr)
-	log.Fatalf("dns failed: %s", server.ListenAndServe())
+	log.Printf("glimpse-agent starting on %s\n", *dnsAddr)
+	log.Fatalf("dns failed: %s", runDNS(*dnsAddr, *srvZone, *srvDomain, store))
 }

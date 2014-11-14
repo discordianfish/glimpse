@@ -81,7 +81,7 @@ func TestAll(t *testing.T) {
 	}
 
 	if want, got := 1, len(res.Answer); want != got {
-		t.Fatalf("want 1 DNS result, got %d", want)
+		t.Fatalf("want %d DNS result, got %d", want, got)
 	}
 
 	hdr := res.Answer[0].Header()
@@ -112,10 +112,10 @@ func TestAll(t *testing.T) {
 func runAgent() (*exec.Cmd, error) {
 	args := []string{
 		"-srv.zone", "cz",
-		"-udp.addr", ":5959",
+		"-dns.addr", ":5959",
 	}
 
-	return runCommand(".deps/glimpse-agent", args, "glimpse-agent started")
+	return runCommand(".deps/glimpse-agent", args, "glimpse-agent")
 }
 
 func runConsul(configDir, dataDir string) (*exec.Cmd, error) {
