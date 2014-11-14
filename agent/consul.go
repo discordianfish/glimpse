@@ -53,8 +53,8 @@ func (s *consulStore) getInstances(info info) (instances, error) {
 		if isEnv && isService {
 			is = append(is, &instance{
 				info: info,
-				host: node.Address,
-				ip:   net.ParseIP(node.Node),
+				host: node.Node,
+				ip:   net.ParseIP(node.Address),
 				port: uint16(node.ServicePort),
 			})
 		}

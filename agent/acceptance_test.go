@@ -18,6 +18,11 @@ import (
 	"github.com/miekg/dns"
 )
 
+const (
+	nodeName   = "hokuspokus"
+	cmdTimeout = 5 * time.Second
+)
+
 var config = []byte(`
 {
 	"service": {
@@ -75,25 +80,32 @@ func TestAll(t *testing.T) {
 		t.Fatalf("DNS lookup failed: %s", err)
 	}
 
-	if len(res.Answer) != 1 {
-		t.Fatalf("expected 1 DNS result, got %d", len(res.Answer))
+	if want, got := 1, len(res.Answer); want != got {
+		t.Fatalf("want 1 DNS result, got %d", want)
 	}
 
-	var (
-		hdr      = res.Answer[0].Header()
-		expected = "http.stream.prod.goku."
-		got      = hdr.Name
-	)
+	hdr := res.Answer[0].Header()
 
-	if expected != got {
-		t.Fatalf("expected '%s', got '%s'", expected, got)
+	if want, got := "http.stream.prod.goku.", hdr.Name; want != got {
+		t.Fatalf("want '%s', got '%s'", want, got)
 	}
 
-	expected = dns.TypeToString[dns.TypeSRV]
-	got = dns.TypeToString[hdr.Rrtype]
+	want, got := dns.TypeToString[dns.TypeSRV], dns.TypeToString[hdr.Rrtype]
+	if want != got {
+		t.Fatalf("want '%s', got '%s'", want, got)
+	}
 
-	if expected != got {
-		t.Fatalf("expected '%s', got '%s'", expected, got)
+	rr, ok := res.Answer[0].(*dns.SRV)
+	if !ok {
+		t.Fatalf("failed to extract SRV type")
+	}
+
+	if want, got := fmt.Sprintf("%s.", nodeName), rr.Target; want != got {
+		t.Fatalf("want %s, got %s", want, got)
+	}
+
+	if want, got := uint16(8080), rr.Port; want != got {
+		t.Fatalf("want %d, got %d", want, got)
 	}
 }
 
@@ -112,6 +124,7 @@ func runConsul(configDir, dataDir string) (*exec.Cmd, error) {
 		"-server",
 		"-bootstrap-expect", "1",
 		"-dc", "cz",
+		"-node", nodeName,
 		"-config-dir", configDir,
 		"-data-dir", dataDir,
 	}
@@ -172,7 +185,7 @@ func runCommand(name string, args []string, success string) (*exec.Cmd, error) {
 			if err != nil {
 				return nil, fmt.Errorf("%s: %s", err, lastLine)
 			}
-		case <-time.After(5 * time.Second):
+		case <-time.After(cmdTimeout):
 			return nil, fmt.Errorf("% startup timed out: %s", name, lastLine)
 		}
 	}
