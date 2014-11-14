@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net"
 
 	"github.com/armon/consul-api"
@@ -12,7 +11,7 @@ type consulStore struct {
 	client *consulapi.Client
 }
 
-func (s *consulStore) getInstances(srv srvInfo) ([]*instance, error) {
+func (s *consulStore) getInstances(srv srvInfo) (instances, error) {
 	var (
 		envTag     = fmt.Sprintf("glimpse:env=%s", srv.env)
 		jobTag     = fmt.Sprintf("glimpse:job=%s", srv.job)
@@ -22,23 +21,15 @@ func (s *consulStore) getInstances(srv srvInfo) ([]*instance, error) {
 			Datacenter: srv.zone,
 		}
 
-		nodes = []*instance{}
+		is = []*instance{}
 	)
 
-	catalog := s.client.Catalog()
-	allNodes, meta, err := catalog.Service(srv.product, jobTag, options)
+	nodes, _, err := s.client.Catalog().Service(srv.product, jobTag, options)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Printf(
-		"consul lookup of %s.*.%s took %dns\n",
-		srv.product,
-		srv.job,
-		meta.RequestTime.Nanoseconds(),
-	)
-
-	for _, node := range allNodes {
+	for _, node := range nodes {
 		var (
 			isEnv     bool
 			isService bool
@@ -54,15 +45,14 @@ func (s *consulStore) getInstances(srv srvInfo) ([]*instance, error) {
 		}
 
 		if isEnv && isService {
-			ins := &instance{
+			is = append(is, &instance{
 				srvInfo: srv,
 				host:    node.Address,
 				ip:      net.ParseIP(node.Node),
 				port:    uint16(node.ServicePort),
-			}
-			nodes = append(nodes, ins)
+			})
 		}
 	}
 
-	return nodes, nil
+	return is, nil
 }

@@ -9,8 +9,10 @@ type instance struct {
 	port    uint16
 }
 
+type instances []*instance
+
 type store interface {
-	getInstances(s srvInfo) ([]*instance, error)
+	getInstances(s srvInfo) (instances, error)
 }
 
 type srvInfo struct {
