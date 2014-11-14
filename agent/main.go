@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"regexp"
 	"strings"
@@ -33,6 +34,17 @@ type srvInfo struct {
 	zone    string
 }
 
+type instance struct {
+	srvInfo srvInfo
+	host    string
+	ip      net.IP
+	port    uint16
+}
+
+type glimpse interface {
+	getInstances(s srvInfo) ([]*instance, error)
+}
+
 func main() {
 	var (
 		consulAddr = flag.String("consul.addr", "127.0.0.1:8500", "consul lookup address")
@@ -44,7 +56,7 @@ func main() {
 	log.SetFlags(log.Lmicroseconds | log.Lshortfile)
 	log.SetOutput(os.Stdout)
 
-	consul, err := consulapi.NewClient(&consulapi.Config{
+	client, err := consulapi.NewClient(&consulapi.Config{
 		Address:    *consulAddr,
 		Datacenter: *srvZone,
 	})
@@ -57,13 +69,15 @@ func main() {
 		Net:  "udp",
 	}
 
-	dns.HandleFunc(".", handleRequest(consul, *srvZone, *srvDomain))
+	store := &consulStore{client}
+
+	dns.HandleFunc(".", handleRequest(store, *srvZone, *srvDomain))
 
 	log.Printf("glimpse-agent started on %s\n", *udpAddr)
 	log.Fatalf("dns failed: %s", server.ListenAndServe())
 }
 
-func handleRequest(consul *consulapi.Client, zone, domain string) dns.HandlerFunc {
+func handleRequest(store glimpse, zone, domain string) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, req *dns.Msg) {
 		var (
 			q   = req.Question[0]
@@ -91,7 +105,7 @@ func handleRequest(consul *consulapi.Client, zone, domain string) dns.HandlerFun
 				break
 			}
 
-			nodes, err := consulLookup(srv, consul)
+			nodes, err := store.getInstances(srv)
 			if err != nil {
 				log.Fatalf("consul lookup failed: %s", err)
 			}
@@ -106,8 +120,8 @@ func handleRequest(consul *consulapi.Client, zone, domain string) dns.HandlerFun
 					},
 					Priority: 0,
 					Weight:   0,
-					Port:     uint16(n.ServicePort),
-					Target:   n.Node + ".",
+					Port:     n.port,
+					Target:   n.host + ".",
 				}
 				res.Answer = append(res.Answer, rec)
 			}
@@ -124,7 +138,11 @@ func handleRequest(consul *consulapi.Client, zone, domain string) dns.HandlerFun
 	}
 }
 
-func consulLookup(srv srvInfo, consul *consulapi.Client) ([]*consulapi.CatalogService, error) {
+type consulStore struct {
+	client *consulapi.Client
+}
+
+func (s *consulStore) getInstances(srv srvInfo) ([]*instance, error) {
 	var (
 		envTag     = fmt.Sprintf("glimpse:env=%s", srv.env)
 		jobTag     = fmt.Sprintf("glimpse:job=%s", srv.job)
@@ -134,10 +152,10 @@ func consulLookup(srv srvInfo, consul *consulapi.Client) ([]*consulapi.CatalogSe
 			Datacenter: srv.zone,
 		}
 
-		nodes = []*consulapi.CatalogService{}
+		nodes = []*instance{}
 	)
 
-	catalog := consul.Catalog()
+	catalog := s.client.Catalog()
 	allNodes, meta, err := catalog.Service(srv.product, jobTag, options)
 	if err != nil {
 		return nil, err
@@ -166,7 +184,13 @@ func consulLookup(srv srvInfo, consul *consulapi.Client) ([]*consulapi.CatalogSe
 		}
 
 		if isEnv && isService {
-			nodes = append(nodes, node)
+			ins := &instance{
+				srvInfo: srv,
+				host:    node.Address,
+				ip:      net.ParseIP(node.Node),
+				port:    uint16(node.ServicePort),
+			}
+			nodes = append(nodes, ins)
 		}
 	}
 
