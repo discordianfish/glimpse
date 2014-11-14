@@ -33,7 +33,18 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 
 		switch q.Qtype {
 		case dns.TypeSRV:
-			srv, err := extractSrvInfo(strings.TrimSuffix(q.Name, "."), zone, domain)
+			addr := q.Name
+
+			// Trim domain if present as it is not relevant for the extraction from the
+			// service address.
+			if strings.Contains(addr, domain) {
+				addr = strings.TrimSuffix(addr, domain+".")
+			}
+
+			// Trim trailing dot of fqdn
+			addr = strings.TrimSuffix(addr, ".")
+
+			srv, err := infoFromAddr(addr, zone)
 			if err != nil {
 				log.Printf("err: extract lookup '%s': %s", q.Name, err)
 				res.SetRcode(req, dns.RcodeServerFailure)

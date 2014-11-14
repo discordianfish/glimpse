@@ -2,11 +2,9 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"regexp"
-	"strings"
 
 	"github.com/armon/consul-api"
 	"github.com/miekg/dns"
@@ -57,56 +55,4 @@ func main() {
 
 	log.Printf("glimpse-agent started on %s\n", *udpAddr)
 	log.Fatalf("dns failed: %s", server.ListenAndServe())
-}
-
-// TODO(alx): test this method.
-func extractSrvInfo(name, zone, domain string) (info, error) {
-	var (
-		fields = strings.SplitN(name, ".", 6)
-		l      = len(fields)
-	)
-
-	switch {
-	case l < 4: // Misses some information
-		return info{}, fmt.Errorf("the name is invalid")
-	case l == 5: // zone is present: service.job.env.product.zone
-		zone = fields[4]
-	case l == 6:
-		domain = fields[5]
-		zone = fields[4]
-	}
-
-	var (
-		product = fields[3]
-		env     = fields[2]
-		job     = fields[1]
-		service = fields[0]
-	)
-
-	if !rDomain.MatchString(domain) {
-		return info{}, fmt.Errorf("domain %q is invalid", domain)
-	}
-	if !rZone.MatchString(zone) {
-		return info{}, fmt.Errorf("zone %q is invalid", zone)
-	}
-	if !rField.MatchString(product) {
-		return info{}, fmt.Errorf("product %q is invalid", product)
-	}
-	if !rField.MatchString(env) {
-		return info{}, fmt.Errorf("env %q is invalid", env)
-	}
-	if !rField.MatchString(job) {
-		return info{}, fmt.Errorf("job %q is invalid", job)
-	}
-	if !rField.MatchString(service) {
-		return info{}, fmt.Errorf("service %q is invalid", service)
-	}
-
-	return info{
-		env:     env,
-		job:     job,
-		product: product,
-		service: service,
-		zone:    zone,
-	}, nil
 }
