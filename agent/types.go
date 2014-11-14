@@ -15,6 +15,11 @@ type store interface {
 	getInstances(info) (instances, error)
 }
 
+// TODO(alx): Find better naming.
+// TODO(alx): evaluate if provider has a place here.
+// TODO(alx): Potentially hardening with concrete types having Validate methods
+//						instead of strings.
+// Code struct for service address: "job.task.env.product".
 type info struct {
 	env      string
 	job      string

@@ -50,6 +50,7 @@ func (s *consulStore) getInstances(info info) (instances, error) {
 			}
 		}
 
+		// TODO(alx): Check if ParseIP returns a non-nil net.IP.
 		if isEnv && isService {
 			is = append(is, &instance{
 				info: info,

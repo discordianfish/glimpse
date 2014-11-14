@@ -69,6 +69,8 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 			log.Fatalf("response failed: %s", err)
 		}
 
+		// TODO(alx): Put logging in central place for control in different
+		//						environemnts.
 		log.Printf("query: %s %s -> %d\n", dns.TypeToString[q.Qtype], q.Name, len(res.Answer))
 	}
 }

@@ -38,6 +38,7 @@ func TestConsulGetInstances(t *testing.T) {
 		product: "roshi",
 		service: "http",
 	}
+	// TODO(alx): Test services with non-matching env/service, hence filtering in getInstnaces.
 	testSet := map[info]test{
 		i: test{
 			want: 1,

@@ -59,6 +59,7 @@ func main() {
 	log.Fatalf("dns failed: %s", server.ListenAndServe())
 }
 
+// TODO(alx): test this method.
 func extractSrvInfo(name, zone, domain string) (info, error) {
 	var (
 		fields = strings.SplitN(name, ".", 6)
