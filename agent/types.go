@@ -3,10 +3,10 @@ package main
 import "net"
 
 type instance struct {
-	srvInfo srvInfo
-	host    string
-	ip      net.IP
-	port    uint16
+	info srvInfo
+	host string
+	ip   net.IP
+	port uint16
 }
 
 type instances []*instance
@@ -16,9 +16,10 @@ type store interface {
 }
 
 type srvInfo struct {
-	env     string
-	job     string
-	product string
-	service string
-	zone    string
+	env      string
+	job      string
+	product  string
+	provider string
+	service  string
+	zone     string
 }
