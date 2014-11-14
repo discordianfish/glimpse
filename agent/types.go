@@ -12,13 +12,13 @@ type instance struct {
 type instances []*instance
 
 type store interface {
-	getInstances(s srvInfo) (instances, error)
+	getInstances(srvInfo) (instances, error)
 }
 
 type srvInfo struct {
-	env     string
-	job     string
-	product string
 	service string
+	job     string
+	env     string
+	product string
 	zone    string
 }
