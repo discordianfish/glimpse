@@ -178,12 +178,12 @@ func TestDNSHandler(t *testing.T) {
 			case dns.TypeA:
 				_, ok := answer.(*dns.A)
 				if !ok {
-					t.Errorf("want A resource record, got %s")
+					t.Error("want A resource record, got something else")
 				}
 			case dns.TypeSRV:
 				_, ok := answer.(*dns.SRV)
 				if !ok {
-					t.Errorf("want SRV resource record, got %s")
+					t.Error("want SRV resource record, got something else")
 				}
 			}
 		}
