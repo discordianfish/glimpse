@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net"
 	"reflect"
 	"testing"
@@ -10,37 +11,103 @@ import (
 
 func TestDNSHandler(t *testing.T) {
 	var (
-		s = &testStore{}
-		h = dnsHandler(s, "tt", "srv.glimpse.io")
+		domain = "srv.glimpse.io"
+		zone   = "tt"
+
+		api = info{
+			service: "http",
+			job:     "api",
+			env:     "prod",
+			product: "harpoon",
+			zone:    zone,
+		}
+		web = info{
+			service: "http",
+			job:     "web",
+			env:     "prod",
+			product: "harpoon",
+			zone:    zone,
+		}
+
+		store = &testStore{
+			instances: instances{
+				{
+					info: api,
+					host: "host1",
+					ip:   net.ParseIP("127.0.0.1"),
+					port: uint16(20000),
+				},
+				{
+					info: api,
+					host: "host1",
+					ip:   net.ParseIP("127.0.0.1"),
+					port: uint16(20001),
+				},
+				{
+					info: api,
+					host: "host2",
+					ip:   net.ParseIP("127.0.0.2"),
+					port: uint16(20000),
+				},
+				{
+					info: api,
+					host: "host2",
+					ip:   net.ParseIP("127.0.0.2"),
+					port: uint16(20003),
+				},
+				{
+					info: web,
+					host: "host3",
+					ip:   net.ParseIP("127.0.0.3"),
+					port: uint16(21000),
+				},
+				{
+					info: web,
+					host: "host4",
+					ip:   net.ParseIP("127.0.0.4"),
+					port: uint16(21003),
+				},
+			},
+		}
+
+		h = dnsHandler(store, zone, domain)
 		w = &testWriter{}
 	)
 
-	s.instances = []*instance{
+	for _, test := range []struct {
+		question string
+		answers  int
+	}{
 		{
-			info: info{
-				service: "http",
-				job:     "api",
-				env:     "prod",
-				product: "harpoon",
-				zone:    "tt",
-			},
-			host: "localhost",
-			ip:   net.ParseIP("127.0.0.1"),
-			port: uint16(12345),
+			question: "http.api.prod.harpoon.",
+			answers:  4,
 		},
-	}
+		{
+			question: fmt.Sprintf("http.api.prod.harpoon.%s.", zone),
+			answers:  4,
+		},
+		{
+			question: fmt.Sprintf("http.api.prod.harpoon.%s.%s.", zone, domain),
+			answers:  4,
+		},
+		{
+			question: "http.web.prod.harpoon.",
+			answers:  2,
+		},
+	} {
+		m := &dns.Msg{}
+		m.SetQuestion(test.question, dns.TypeSRV)
 
-	m := &dns.Msg{}
-	m.SetQuestion("http.api.prod.harpoon.", dns.TypeSRV)
-	h(w, m)
-	r := w.msg
+		h(w, m)
+		r := w.msg
 
-	if want, got := dns.RcodeSuccess, m.Rcode; want != got {
-		t.Errorf("want %d rcode, got %d\n", want, got)
-	}
+		if want, got := dns.RcodeSuccess, m.Rcode; want != got {
+			t.Errorf("want %d rcode, got %d\n", want, got)
+		}
 
-	if want, got := 1, len(r.Answer); want != got {
-		t.Errorf("want %d answers, got %d\n", want, got)
+		if want, got := test.answers, len(r.Answer); want != got {
+			t.Errorf("want %d answers, got %d\n", want, got)
+		}
 	}
 }
 
