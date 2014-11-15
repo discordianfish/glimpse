@@ -59,7 +59,9 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 
 		instances, err = store.getInstances(srv)
 		if err != nil {
-			log.Fatalf("consul lookup failed: %s", err)
+			log.Printf("[warning] store lookup fail '%s': %s", q.Name, err)
+			res.SetRcode(req, dns.RcodeServerFailure)
+			goto respond
 		}
 
 		// TODO(ts): handle registered service without instances

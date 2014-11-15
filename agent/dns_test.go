@@ -152,6 +152,7 @@ func TestDNSHandlerZeroQuestions(t *testing.T) {
 		m = &dns.Msg{}
 		w = &testWriter{}
 	)
+
 	h(w, m)
 	r := w.msg
 
@@ -186,6 +187,22 @@ func TestDNSHandlerMultiQuestions(t *testing.T) {
 	}
 }
 
+func TestDNSHandlerBrokenStore(t *testing.T) {
+	var (
+		h = dnsHandler(&brokenStore{}, "tt", "test.glimpse.io")
+		m = &dns.Msg{}
+		w = &testWriter{}
+	)
+
+	m.SetQuestion("http.api.prod.harpoon.tt.test.glimpse.io.", dns.TypeSRV)
+	h(w, m)
+	r := w.msg
+
+	if want, got := dns.RcodeServerFailure, r.Rcode; want != got {
+		t.Errorf("want rcode %s, got %s", dns.RcodeToString[want], dns.RcodeToString[got])
+	}
+}
+
 // testStore implements the glimpse.store interface.
 type testStore struct {
 	instances []*instance
@@ -201,6 +218,13 @@ func (s *testStore) getInstances(srv info) (instances, error) {
 	}
 
 	return r, nil
+}
+
+// brokenStore implements the glimpse.store interface.
+type brokenStore struct{}
+
+func (s *brokenStore) getInstances(srv info) (instances, error) {
+	return nil, fmt.Errorf("could not get instances")
 }
 
 // testWriter implements the dns.ResponseWriter interface.
