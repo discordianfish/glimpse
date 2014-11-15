@@ -110,6 +110,26 @@ func TestDNSHandler(t *testing.T) {
 			qtype:    dns.TypeA,
 			answers:  2,
 		},
+		{
+			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s.", zone, domain),
+			qtype:    dns.TypeAAAA,
+			rcode:    dns.RcodeNotImplemented,
+		},
+		{
+			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s.", zone, domain),
+			qtype:    dns.TypeMX,
+			rcode:    dns.RcodeNotImplemented,
+		},
+		{
+			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s.", zone, domain),
+			qtype:    dns.TypeNS,
+			rcode:    dns.RcodeNotImplemented,
+		},
+		{
+			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s.", zone, domain),
+			qtype:    dns.TypeTXT,
+			rcode:    dns.RcodeNotImplemented,
+		},
 	} {
 		m := &dns.Msg{}
 		m.SetQuestion(test.question, test.qtype)
@@ -123,6 +143,10 @@ func TestDNSHandler(t *testing.T) {
 
 		if want, got := false, r.RecursionAvailable; want != got {
 			t.Errorf("want available recursion %t, got %t", want, got)
+		}
+
+		if want, got := r.Rcode == dns.RcodeSuccess, r.Authoritative; want != got {
+			t.Errorf("want authoritative %t, got %t", want, got)
 		}
 
 		if want, got := test.answers, len(r.Answer); want != got {

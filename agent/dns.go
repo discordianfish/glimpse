@@ -101,7 +101,8 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 				res.Answer = append(res.Answer, rr)
 			}
 		default:
-			res.SetRcode(req, dns.RcodeNameError)
+			res.SetRcode(req, dns.RcodeNotImplemented)
+			goto respond
 		}
 
 		res.Authoritative = true
