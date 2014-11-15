@@ -64,6 +64,12 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 				log.Fatalf("consul lookup failed: %s", err)
 			}
 
+			// TODO(ts): handle registered service without instances
+			if len(nodes) == 0 {
+				res.SetRcode(req, dns.RcodeNameError)
+				break
+			}
+
 			for _, n := range nodes {
 				rec := &dns.SRV{
 					Hdr: dns.RR_Header{

@@ -80,6 +80,10 @@ func TestDNSHandler(t *testing.T) {
 		rcode    int
 	}{
 		{
+			question: fmt.Sprintf("foo.bar.baz.qux.%s.%s.", zone, domain),
+			rcode:    dns.RcodeNameError,
+		},
+		{
 			question: fmt.Sprintf("http.api.prod.harpoon.%s.%s.", zone, domain),
 			answers:  4,
 		},
