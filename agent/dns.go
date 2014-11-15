@@ -7,19 +7,6 @@ import (
 	"github.com/miekg/dns"
 )
 
-func nonExistentHandler() dns.HandlerFunc {
-	return func(w dns.ResponseWriter, req *dns.Msg) {
-		res := &dns.Msg{}
-		res.SetReply(req)
-		res.SetRcode(req, dns.RcodeNameError)
-
-		err := w.WriteMsg(res)
-		if err != nil {
-			log.Printf("[warning] write msg failed: %s", err)
-		}
-	}
-}
-
 func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, req *dns.Msg) {
 		var (
@@ -45,6 +32,11 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 		}
 
 		q = req.Question[0]
+
+		if !strings.HasSuffix(q.Name, "."+domain+".") {
+			res.SetRcode(req, dns.RcodeNameError)
+			goto respond
+		}
 
 		// Trim domain as it is not relevant for the extraction from the
 		// service address.

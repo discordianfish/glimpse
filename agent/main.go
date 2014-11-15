@@ -51,8 +51,7 @@ func main() {
 		Net:  "udp",
 	}
 
-	dns.HandleFunc(*dnsZone+".", dnsHandler(store, *srvZone, *dnsZone))
-	dns.HandleFunc(".", nonExistentHandler())
+	dns.HandleFunc(".", dnsHandler(store, *srvZone, *dnsZone))
 
 	log.Printf("glimpse-agent starting on %s\n", *dnsAddr)
 	log.Fatalf("DNS failed: %s", server.ListenAndServe())
