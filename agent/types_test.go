@@ -14,17 +14,10 @@ func TestInfoFromAddr(t *testing.T) {
 			service: "http",
 			zone:    "ro",
 		},
-		"memcached.cache.prod.search": info{
-			env:     "prod",
-			job:     "cache",
-			product: "search",
-			service: "memcached",
-			zone:    defaultZone,
-		},
 	}
 
 	for input, want := range tests {
-		got, err := infoFromAddr(input, defaultZone)
+		got, err := infoFromAddr(input)
 		if err != nil {
 			t.Errorf("info extraction failed '%s': %s", input, err)
 			continue
@@ -36,7 +29,7 @@ func TestInfoFromAddr(t *testing.T) {
 	}
 }
 
-func TestInforFromAddrInvalid(t *testing.T) {
+func TestInfoFromAddrInvalid(t *testing.T) {
 	tests := []string{
 		"service.job.env",                     // missing fields
 		"service..env.product",                // zero-length field
@@ -49,9 +42,9 @@ func TestInforFromAddrInvalid(t *testing.T) {
 	}
 
 	for _, input := range tests {
-		_, err := infoFromAddr(input, defaultZone)
+		_, err := infoFromAddr(input)
 		if err == nil {
-			t.Errorf("exreaction from addr '%s' did not error", input)
+			t.Errorf("extraction from addr '%s' did not error", input)
 		}
 	}
 }

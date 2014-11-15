@@ -34,22 +34,15 @@ type info struct {
 }
 
 // func extractSrvInfo(name, zone, domain string) (info, error) {
-func infoFromAddr(addr, zone string) (info, error) {
-	var (
-		fields = strings.SplitN(addr, ".", 5)
-		l      = len(fields)
-	)
+func infoFromAddr(addr string) (info, error) {
+	fields := strings.SplitN(addr, ".", 5)
 
-	switch {
-	case l < 4: // Misses some information
-		return info{}, fmt.Errorf("not enough fields in service address")
-	case l == 5: // zone is present: service.job.env.product.zone
-		zone = fields[4]
-	case l > 5:
-		return info{}, fmt.Errorf("too many fields in service address")
+	if len(fields) != 5 {
+		return info{}, fmt.Errorf("invalid service address: %s", addr)
 	}
 
 	var (
+		zone    = fields[4]
 		product = fields[3]
 		env     = fields[2]
 		job     = fields[1]

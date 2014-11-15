@@ -13,9 +13,23 @@ func runDNS(addr, zone, domain string, store store) error {
 		Net:  "udp",
 	}
 
-	dns.HandleFunc(".", dnsHandler(store, zone, domain))
+	dns.HandleFunc(domain+".", dnsHandler(store, zone, domain))
+	dns.HandleFunc(".", nonExistentHandler())
 
 	return server.ListenAndServe()
+}
+
+func nonExistentHandler() dns.HandlerFunc {
+	return func(w dns.ResponseWriter, req *dns.Msg) {
+		res := &dns.Msg{}
+		res.SetReply(req)
+		res.SetRcode(req, dns.RcodeNameError)
+
+		err := w.WriteMsg(res)
+		if err != nil {
+			log.Printf("[warning] write msg failed: %s", err)
+		}
+	}
 }
 
 func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
@@ -47,19 +61,14 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 		case dns.TypeSRV:
 			addr := q.Name
 
-			// Trim domain if present as it is not relevant for the extraction from the
+			// Trim domain as it is not relevant for the extraction from the
 			// service address.
-			if strings.Contains(addr, domain) {
-				addr = strings.TrimSuffix(addr, domain+".")
-			}
+			addr = strings.TrimSuffix(addr, "."+domain+".")
 
-			// Trim trailing dot of fqdn
-			addr = strings.TrimSuffix(addr, ".")
-
-			srv, err := infoFromAddr(addr, zone)
+			srv, err := infoFromAddr(addr)
 			if err != nil {
 				log.Printf("err: extract lookup '%s': %s", q.Name, err)
-				res.SetRcode(req, dns.RcodeServerFailure)
+				res.SetRcode(req, dns.RcodeNameError)
 				break
 			}
 
@@ -89,7 +98,7 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 
 		err := w.WriteMsg(res)
 		if err != nil {
-			log.Fatalf("response failed: %s", err)
+			log.Printf("[warning] write msg failed: %s", err)
 		}
 
 		// TODO(alx): Put logging in central place for control in different

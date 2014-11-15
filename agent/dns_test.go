@@ -77,21 +77,14 @@ func TestDNSHandler(t *testing.T) {
 	for _, test := range []struct {
 		question string
 		answers  int
+		rcode    int
 	}{
-		{
-			question: "http.api.prod.harpoon.",
-			answers:  4,
-		},
-		{
-			question: fmt.Sprintf("http.api.prod.harpoon.%s.", zone),
-			answers:  4,
-		},
 		{
 			question: fmt.Sprintf("http.api.prod.harpoon.%s.%s.", zone, domain),
 			answers:  4,
 		},
 		{
-			question: "http.web.prod.harpoon.",
+			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s.", zone, domain),
 			answers:  2,
 		},
 	} {
@@ -101,8 +94,12 @@ func TestDNSHandler(t *testing.T) {
 		h(w, m)
 		r := w.msg
 
-		if want, got := dns.RcodeSuccess, m.Rcode; want != got {
-			t.Errorf("want %d rcode, got %d\n", want, got)
+		if want, got := test.rcode, r.Rcode; want != got {
+			t.Errorf("want rcode %s, got %s", dns.RcodeToString[want], dns.RcodeToString[got])
+		}
+
+		if want, got := false, r.RecursionAvailable; want != got {
+			t.Errorf("want available recursion %t, got %t", want, got)
 		}
 
 		if want, got := test.answers, len(r.Answer); want != got {

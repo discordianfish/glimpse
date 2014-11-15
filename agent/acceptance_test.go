@@ -19,8 +19,11 @@ import (
 )
 
 const (
-	nodeName   = "hokuspokus"
+	addr       = "127.0.0.1:5959"
 	cmdTimeout = 5 * time.Second
+	domain     = "test.glimpse.io"
+	nodeName   = "hokuspokus"
+	zone       = "cz"
 )
 
 var config = []byte(`
@@ -70,14 +73,17 @@ func TestAll(t *testing.T) {
 	}
 	defer terminateCommand(agent)
 
-	c := &dns.Client{}
-	m := &dns.Msg{}
+	// success
+	q := fmt.Sprintf("http.stream.prod.goku.%s.%s.", zone, domain)
 
-	m.SetQuestion("http.stream.prod.goku.", dns.TypeSRV)
-
-	res, _, err := c.Exchange(m, "127.0.0.1:5959")
+	res, err := query(q)
 	if err != nil {
 		t.Fatalf("DNS lookup failed: %s", err)
+	}
+
+	want, got := dns.RcodeToString[dns.RcodeSuccess], dns.RcodeToString[res.Rcode]
+	if want != got {
+		t.Fatalf("%s: want rcode '%s', got '%s'", q, want, got)
 	}
 
 	if want, got := 1, len(res.Answer); want != got {
@@ -86,11 +92,11 @@ func TestAll(t *testing.T) {
 
 	hdr := res.Answer[0].Header()
 
-	if want, got := "http.stream.prod.goku.", hdr.Name; want != got {
+	if want, got := q, hdr.Name; want != got {
 		t.Fatalf("want '%s', got '%s'", want, got)
 	}
 
-	want, got := dns.TypeToString[dns.TypeSRV], dns.TypeToString[hdr.Rrtype]
+	want, got = dns.TypeToString[dns.TypeSRV], dns.TypeToString[hdr.Rrtype]
 	if want != got {
 		t.Fatalf("want '%s', got '%s'", want, got)
 	}
@@ -107,12 +113,44 @@ func TestAll(t *testing.T) {
 	if want, got := uint16(8080), rr.Port; want != got {
 		t.Fatalf("want %d, got %d", want, got)
 	}
+
+	// fail - non-existent domain
+	for _, q := range []string{
+		"http.stream.prod.goku.",
+		fmt.Sprintf("http.stream.prod.goku.%s.", zone),
+		fmt.Sprintf("http.stream.prod.goku.%s.", domain),
+		fmt.Sprintf("http.stream.prod.goku.%s.example.domain.", zone),
+	} {
+		res, err := query(q)
+		if err != nil {
+			t.Fatalf("DNS lookup failed: %s", err)
+		}
+
+		want, got := dns.RcodeToString[dns.RcodeNameError], dns.RcodeToString[res.Rcode]
+		if want != got {
+			t.Fatalf("%s: want rcode '%s', got '%s'", q, want, got)
+		}
+	}
+
+}
+
+func query(q string) (*dns.Msg, error) {
+	var (
+		c = &dns.Client{}
+		m = &dns.Msg{}
+	)
+
+	m.SetQuestion(q, dns.TypeSRV)
+
+	res, _, err := c.Exchange(m, addr)
+	return res, err
 }
 
 func runAgent() (*exec.Cmd, error) {
 	args := []string{
-		"-srv.zone", "cz",
-		"-dns.addr", ":5959",
+		"-srv.domain", domain,
+		"-srv.zone", zone,
+		"-dns.addr", addr,
 	}
 
 	return runCommand(".deps/glimpse-agent", args, "glimpse-agent")
@@ -123,7 +161,7 @@ func runConsul(configDir, dataDir string) (*exec.Cmd, error) {
 		"agent",
 		"-server",
 		"-bootstrap-expect", "1",
-		"-dc", "cz",
+		"-dc", zone,
 		"-node", nodeName,
 		"-config-dir", configDir,
 		"-data-dir", dataDir,
