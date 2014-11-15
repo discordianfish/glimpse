@@ -26,6 +26,7 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 			goto respond
 		}
 
+		// http://maradns.samiam.org/multiple.qdcount.html
 		if len(req.Question) > 1 {
 			res.SetRcode(req, dns.RcodeNotImplemented)
 			goto respond
