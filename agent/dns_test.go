@@ -146,6 +146,46 @@ func TestDNSHandler(t *testing.T) {
 	}
 }
 
+func TestDNSHandlerZeroQuestions(t *testing.T) {
+	var (
+		h = dnsHandler(&testStore{}, "tt", "test.glimpse.io")
+		m = &dns.Msg{}
+		w = &testWriter{}
+	)
+	h(w, m)
+	r := w.msg
+
+	if want, got := dns.RcodeFormatError, r.Rcode; want != got {
+		t.Errorf("want rcode %s, got %s", dns.RcodeToString[want], dns.RcodeToString[got])
+	}
+}
+
+func TestDNSHandlerMultiQuestions(t *testing.T) {
+	var (
+		h = dnsHandler(&testStore{}, "tt", "test.glimpse.io")
+		m = &dns.Msg{}
+		w = &testWriter{}
+	)
+
+	m.Id = dns.Id()
+	m.RecursionDesired = true
+	m.Question = make([]dns.Question, 3)
+	for i, _ := range m.Question {
+		m.Question[i] = dns.Question{
+			Name:   "foo.bar.baz.",
+			Qtype:  dns.TypeA,
+			Qclass: dns.ClassINET,
+		}
+	}
+
+	h(w, m)
+	r := w.msg
+
+	if want, got := dns.RcodeNotImplemented, r.Rcode; want != got {
+		t.Errorf("want rcode %s, got %s", dns.RcodeToString[want], dns.RcodeToString[got])
+	}
+}
+
 // testStore implements the glimpse.store interface.
 type testStore struct {
 	instances []*instance

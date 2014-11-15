@@ -23,32 +23,34 @@ func nonExistentHandler() dns.HandlerFunc {
 func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, req *dns.Msg) {
 		var (
+			addr      string
+			err       error
 			instances instances
+			srv       info
+			q         dns.Question
 
-			q   = req.Question[0]
 			res = &dns.Msg{}
 		)
 
-		if len(req.Question) > 1 {
-			log.Printf("warn: question > 1: %+v\n", req.Question)
+		res.SetReply(req)
 
-			for _, q := range req.Question {
-				log.Printf(
-					"warn: %s %s %s\n",
-					dns.TypeToString[q.Qtype],
-					dns.ClassToString[q.Qclass],
-					q.Name,
-				)
-			}
+		if len(req.Question) == 0 {
+			res.SetRcode(req, dns.RcodeFormatError)
+			goto respond
 		}
 
-		res.SetReply(req)
+		if len(req.Question) > 1 {
+			res.SetRcode(req, dns.RcodeNotImplemented)
+			goto respond
+		}
+
+		q = req.Question[0]
 
 		// Trim domain as it is not relevant for the extraction from the
 		// service address.
-		addr := strings.TrimSuffix(q.Name, "."+domain+".")
+		addr = strings.TrimSuffix(q.Name, "."+domain+".")
 
-		srv, err := infoFromAddr(addr)
+		srv, err = infoFromAddr(addr)
 		if err != nil {
 			log.Printf("[warning] extract lookup '%s': %s", q.Name, err)
 			res.SetRcode(req, dns.RcodeNameError)
