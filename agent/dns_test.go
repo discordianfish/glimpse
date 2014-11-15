@@ -76,24 +76,43 @@ func TestDNSHandler(t *testing.T) {
 
 	for _, test := range []struct {
 		question string
+		qtype    uint16
 		answers  int
 		rcode    int
 	}{
 		{
 			question: fmt.Sprintf("foo.bar.baz.qux.%s.%s.", zone, domain),
+			qtype:    dns.TypeSRV,
 			rcode:    dns.RcodeNameError,
 		},
 		{
 			question: fmt.Sprintf("http.api.prod.harpoon.%s.%s.", zone, domain),
+			qtype:    dns.TypeSRV,
 			answers:  4,
 		},
 		{
 			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s.", zone, domain),
+			qtype:    dns.TypeSRV,
+			answers:  2,
+		},
+		{
+			question: fmt.Sprintf("foo.bar.baz.qux.%s.%s.", zone, domain),
+			qtype:    dns.TypeA,
+			rcode:    dns.RcodeNameError,
+		},
+		{
+			question: fmt.Sprintf("http.api.prod.harpoon.%s.%s.", zone, domain),
+			qtype:    dns.TypeA,
+			answers:  4,
+		},
+		{
+			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s.", zone, domain),
+			qtype:    dns.TypeA,
 			answers:  2,
 		},
 	} {
 		m := &dns.Msg{}
-		m.SetQuestion(test.question, dns.TypeSRV)
+		m.SetQuestion(test.question, test.qtype)
 
 		h(w, m)
 		r := w.msg
@@ -108,6 +127,21 @@ func TestDNSHandler(t *testing.T) {
 
 		if want, got := test.answers, len(r.Answer); want != got {
 			t.Errorf("want %d answers, got %d\n", want, got)
+		}
+
+		for _, answer := range r.Answer {
+			switch test.qtype {
+			case dns.TypeA:
+				_, ok := answer.(*dns.A)
+				if !ok {
+					t.Errorf("want A resource record, got %s")
+				}
+			case dns.TypeSRV:
+				_, ok := answer.(*dns.SRV)
+				if !ok {
+					t.Errorf("want SRV resource record, got %s")
+				}
+			}
 		}
 	}
 }

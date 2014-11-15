@@ -23,6 +23,8 @@ func nonExistentHandler() dns.HandlerFunc {
 func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, req *dns.Msg) {
 		var (
+			instances instances
+
 			q   = req.Question[0]
 			res = &dns.Msg{}
 		)
@@ -41,37 +43,46 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 		}
 
 		res.SetReply(req)
-		res.Authoritative = true
-		res.RecursionAvailable = false
+
+		// Trim domain as it is not relevant for the extraction from the
+		// service address.
+		addr := strings.TrimSuffix(q.Name, "."+domain+".")
+
+		srv, err := infoFromAddr(addr)
+		if err != nil {
+			log.Printf("[warning] extract lookup '%s': %s", q.Name, err)
+			res.SetRcode(req, dns.RcodeNameError)
+			goto respond
+		}
+
+		instances, err = store.getInstances(srv)
+		if err != nil {
+			log.Fatalf("consul lookup failed: %s", err)
+		}
+
+		// TODO(ts): handle registered service without instances
+		if len(instances) == 0 {
+			res.SetRcode(req, dns.RcodeNameError)
+			goto respond
+		}
 
 		switch q.Qtype {
+		case dns.TypeA:
+			for _, ins := range instances {
+				rr := &dns.A{
+					Hdr: dns.RR_Header{
+						Name:   q.Name,
+						Rrtype: dns.TypeA,
+						Class:  dns.ClassINET,
+						Ttl:    5,
+					},
+					A: ins.ip,
+				}
+				res.Answer = append(res.Answer, rr)
+			}
 		case dns.TypeSRV:
-			addr := q.Name
-
-			// Trim domain as it is not relevant for the extraction from the
-			// service address.
-			addr = strings.TrimSuffix(addr, "."+domain+".")
-
-			srv, err := infoFromAddr(addr)
-			if err != nil {
-				log.Printf("err: extract lookup '%s': %s", q.Name, err)
-				res.SetRcode(req, dns.RcodeNameError)
-				break
-			}
-
-			nodes, err := store.getInstances(srv)
-			if err != nil {
-				log.Fatalf("consul lookup failed: %s", err)
-			}
-
-			// TODO(ts): handle registered service without instances
-			if len(nodes) == 0 {
-				res.SetRcode(req, dns.RcodeNameError)
-				break
-			}
-
-			for _, n := range nodes {
-				rec := &dns.SRV{
+			for _, ins := range instances {
+				rr := &dns.SRV{
 					Hdr: dns.RR_Header{
 						Name:   q.Name,
 						Rrtype: dns.TypeSRV,
@@ -80,16 +91,20 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 					},
 					Priority: 0,
 					Weight:   0,
-					Port:     n.port,
-					Target:   n.host + ".",
+					Port:     ins.port,
+					Target:   ins.host + ".",
 				}
-				res.Answer = append(res.Answer, rec)
+				res.Answer = append(res.Answer, rr)
 			}
 		default:
 			res.SetRcode(req, dns.RcodeNameError)
 		}
 
-		err := w.WriteMsg(res)
+		res.Authoritative = true
+		res.RecursionAvailable = false
+
+	respond:
+		err = w.WriteMsg(res)
 		if err != nil {
 			log.Printf("[warning] write msg failed: %s", err)
 		}

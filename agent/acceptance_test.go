@@ -19,11 +19,17 @@ import (
 )
 
 const (
-	addr       = "127.0.0.1:5959"
+	// cmd control
 	cmdTimeout = 5 * time.Second
-	dnsZone    = "test.glimpse.io"
-	nodeName   = "hokuspokus"
-	srvZone    = "cz"
+
+	// glimpse-agent
+	addr    = "127.0.0.1:5959"
+	dnsZone = "test.glimpse.io"
+	srvZone = "cz"
+
+	// consul-agent
+	advertise = "1.2.3.4"
+	nodeName  = "hokuspokus"
 )
 
 var config = []byte(`
@@ -73,10 +79,15 @@ func TestAll(t *testing.T) {
 	}
 	defer terminateCommand(agent)
 
-	// success
-	q := fmt.Sprintf("http.stream.prod.goku.%s.%s.", srvZone, dnsZone)
+	var (
+		q   string
+		hdr *dns.RR_Header
+	)
 
-	res, err := query(q)
+	// success - SRV
+	q = fmt.Sprintf("http.stream.prod.goku.%s.%s.", srvZone, dnsZone)
+
+	res, err := query(q, dns.TypeSRV)
 	if err != nil {
 		t.Fatalf("DNS lookup failed: %s", err)
 	}
@@ -90,28 +101,55 @@ func TestAll(t *testing.T) {
 		t.Fatalf("want %d DNS result, got %d", want, got)
 	}
 
-	hdr := res.Answer[0].Header()
+	hdr = res.Answer[0].Header()
 
 	if want, got := q, hdr.Name; want != got {
 		t.Fatalf("want '%s', got '%s'", want, got)
 	}
 
-	want, got = dns.TypeToString[dns.TypeSRV], dns.TypeToString[hdr.Rrtype]
-	if want != got {
-		t.Fatalf("want '%s', got '%s'", want, got)
-	}
-
-	rr, ok := res.Answer[0].(*dns.SRV)
+	srv, ok := res.Answer[0].(*dns.SRV)
 	if !ok {
 		t.Fatalf("failed to extract SRV type")
 	}
 
-	if want, got := fmt.Sprintf("%s.", nodeName), rr.Target; want != got {
-		t.Fatalf("want %s, got %s", want, got)
+	if want, got := fmt.Sprintf("%s.", nodeName), srv.Target; want != got {
+		t.Fatalf("want target %s, got %s", want, got)
 	}
 
-	if want, got := uint16(8080), rr.Port; want != got {
-		t.Fatalf("want %d, got %d", want, got)
+	if want, got := uint16(8080), srv.Port; want != got {
+		t.Fatalf("want port %d, got %d", want, got)
+	}
+
+	// success - A
+	q = fmt.Sprintf("http.stream.prod.goku.%s.%s.", srvZone, dnsZone)
+
+	res, err = query(q, dns.TypeA)
+	if err != nil {
+		t.Fatalf("DNS lookup failed: %s", err)
+	}
+
+	want, got = dns.RcodeToString[dns.RcodeSuccess], dns.RcodeToString[res.Rcode]
+	if want != got {
+		t.Fatalf("want rcode '%s', got '%s'", want, got)
+	}
+
+	if want, got := 1, len(res.Answer); want != got {
+		t.Fatalf("want %d DNS result, got %d", want, got)
+	}
+
+	hdr = res.Answer[0].Header()
+
+	if want, got := q, hdr.Name; want != got {
+		t.Fatalf("want '%s', got '%s'", want, got)
+	}
+
+	a, ok := res.Answer[0].(*dns.A)
+	if !ok {
+		t.Fatalf("failed to extract A type")
+	}
+
+	if want, got := advertise, a.A.String(); want != got {
+		t.Fatalf("want A %s, got %s", want, got)
 	}
 
 	// fail - non-existent DNS zone
@@ -121,7 +159,7 @@ func TestAll(t *testing.T) {
 		fmt.Sprintf("http.stream.prod.goku.%s.", dnsZone),
 		fmt.Sprintf("http.stream.prod.goku.%s.example.domain.", srvZone),
 	} {
-		res, err := query(q)
+		res, err := query(q, dns.TypeSRV)
 		if err != nil {
 			t.Fatalf("DNS lookup failed: %s", err)
 		}
@@ -133,13 +171,13 @@ func TestAll(t *testing.T) {
 	}
 }
 
-func query(q string) (*dns.Msg, error) {
+func query(q string, t uint16) (*dns.Msg, error) {
 	var (
 		c = &dns.Client{}
 		m = &dns.Msg{}
 	)
 
-	m.SetQuestion(q, dns.TypeSRV)
+	m.SetQuestion(q, t)
 
 	res, _, err := c.Exchange(m, addr)
 	return res, err
@@ -159,6 +197,7 @@ func runConsul(configDir, dataDir string) (*exec.Cmd, error) {
 	args := []string{
 		"agent",
 		"-server",
+		"-advertise", advertise,
 		"-bootstrap-expect", "1",
 		"-dc", srvZone,
 		"-node", nodeName,
