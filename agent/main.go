@@ -7,11 +7,12 @@ import (
 	"regexp"
 
 	"github.com/armon/consul-api"
+	"github.com/miekg/dns"
 )
 
 const (
-	defaultDomain = "srv.glimpse.io"
-	defaultZone   = "gg"
+	defaultDNSZone = "srv.glimpse.io"
+	defaultSrvZone = "gg"
 
 	routeLookup = `/lookup/{name:[a-z0-9\-\.]+}`
 )
@@ -25,9 +26,9 @@ var (
 func main() {
 	var (
 		consulAddr = flag.String("consul.addr", "127.0.0.1:8500", "consul lookup address")
-		srvDomain  = flag.String("srv.domain", defaultDomain, "srv lookup domain")
-		srvZone    = flag.String("srv.zone", defaultZone, "srv lookup zone")
 		dnsAddr    = flag.String("dns.addr", ":5959", "DNS address to bind to")
+		dnsZone    = flag.String("dns.zone", defaultDNSZone, "DNS zone")
+		srvZone    = flag.String("srv.zone", defaultSrvZone, "srv zone")
 	)
 	flag.Parse()
 	log.SetFlags(log.Lmicroseconds | log.Lshortfile)
@@ -45,6 +46,14 @@ func main() {
 		client: client,
 	}
 
+	server := &dns.Server{
+		Addr: *dnsAddr,
+		Net:  "udp",
+	}
+
+	dns.HandleFunc(*dnsZone+".", dnsHandler(store, *srvZone, *dnsZone))
+	dns.HandleFunc(".", nonExistentHandler())
+
 	log.Printf("glimpse-agent starting on %s\n", *dnsAddr)
-	log.Fatalf("dns failed: %s", runDNS(*dnsAddr, *srvZone, *srvDomain, store))
+	log.Fatalf("DNS failed: %s", server.ListenAndServe())
 }

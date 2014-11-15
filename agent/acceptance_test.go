@@ -21,9 +21,9 @@ import (
 const (
 	addr       = "127.0.0.1:5959"
 	cmdTimeout = 5 * time.Second
-	domain     = "test.glimpse.io"
+	dnsZone    = "test.glimpse.io"
 	nodeName   = "hokuspokus"
-	zone       = "cz"
+	srvZone    = "cz"
 )
 
 var config = []byte(`
@@ -74,7 +74,7 @@ func TestAll(t *testing.T) {
 	defer terminateCommand(agent)
 
 	// success
-	q := fmt.Sprintf("http.stream.prod.goku.%s.%s.", zone, domain)
+	q := fmt.Sprintf("http.stream.prod.goku.%s.%s.", srvZone, dnsZone)
 
 	res, err := query(q)
 	if err != nil {
@@ -114,12 +114,12 @@ func TestAll(t *testing.T) {
 		t.Fatalf("want %d, got %d", want, got)
 	}
 
-	// fail - non-existent domain
+	// fail - non-existent DNS zone
 	for _, q := range []string{
 		"http.stream.prod.goku.",
-		fmt.Sprintf("http.stream.prod.goku.%s.", zone),
-		fmt.Sprintf("http.stream.prod.goku.%s.", domain),
-		fmt.Sprintf("http.stream.prod.goku.%s.example.domain.", zone),
+		fmt.Sprintf("http.stream.prod.goku.%s.", srvZone),
+		fmt.Sprintf("http.stream.prod.goku.%s.", dnsZone),
+		fmt.Sprintf("http.stream.prod.goku.%s.example.domain.", srvZone),
 	} {
 		res, err := query(q)
 		if err != nil {
@@ -131,7 +131,6 @@ func TestAll(t *testing.T) {
 			t.Fatalf("%s: want rcode '%s', got '%s'", q, want, got)
 		}
 	}
-
 }
 
 func query(q string) (*dns.Msg, error) {
@@ -148,9 +147,9 @@ func query(q string) (*dns.Msg, error) {
 
 func runAgent() (*exec.Cmd, error) {
 	args := []string{
-		"-srv.domain", domain,
-		"-srv.zone", zone,
 		"-dns.addr", addr,
+		"-dns.zone", dnsZone,
+		"-srv.zone", srvZone,
 	}
 
 	return runCommand(".deps/glimpse-agent", args, "glimpse-agent")
@@ -161,7 +160,7 @@ func runConsul(configDir, dataDir string) (*exec.Cmd, error) {
 		"agent",
 		"-server",
 		"-bootstrap-expect", "1",
-		"-dc", zone,
+		"-dc", srvZone,
 		"-node", nodeName,
 		"-config-dir", configDir,
 		"-data-dir", dataDir,

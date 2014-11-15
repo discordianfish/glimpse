@@ -26,7 +26,7 @@ func TestConsulGetInstances(t *testing.T) {
 
 	client, err := consulapi.NewClient(&consulapi.Config{
 		Address:    url.Host,
-		Datacenter: defaultZone,
+		Datacenter: defaultSrvZone,
 	})
 	if err != nil {
 		t.Fatalf("consul connection failed: %s", err)

@@ -7,18 +7,6 @@ import (
 	"github.com/miekg/dns"
 )
 
-func runDNS(addr, zone, domain string, store store) error {
-	server := &dns.Server{
-		Addr: addr,
-		Net:  "udp",
-	}
-
-	dns.HandleFunc(domain+".", dnsHandler(store, zone, domain))
-	dns.HandleFunc(".", nonExistentHandler())
-
-	return server.ListenAndServe()
-}
-
 func nonExistentHandler() dns.HandlerFunc {
 	return func(w dns.ResponseWriter, req *dns.Msg) {
 		res := &dns.Msg{}
@@ -53,7 +41,6 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 		}
 
 		res.SetReply(req)
-		// TODO(ts): Only set authoritative if name can be parsed
 		res.Authoritative = true
 		res.RecursionAvailable = false
 

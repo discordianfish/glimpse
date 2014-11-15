@@ -35,7 +35,7 @@ acceptance-test: $(DEPS_DIR) $(AGENT_BIN) $(CONSUL_BIN)
 
 .PHONY: unit-test
 unit-test:
-	# TODO(ts): bundle dependencies
+	# TODO(ts): vendor dependencies
 	go get -d ./...
 	go test -v
 
