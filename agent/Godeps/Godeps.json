@@ -1,0 +1,14 @@
+{
+	"ImportPath": "github.com/soundcloud/glimpse/agent",
+	"GoVersion": "go1.3.3",
+	"Deps": [
+		{
+			"ImportPath": "github.com/armon/consul-api",
+			"Rev": "1b81c8e0c4cbf1d382310e4c0dc11221632e79d1"
+		},
+		{
+			"ImportPath": "github.com/miekg/dns",
+			"Rev": "dc30c7cd4ed2fc8af73d49da4ee285404958b8bd"
+		}
+	]
+}
