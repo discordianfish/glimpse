@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	defaultDNSZone = "srv.glimpse.io"
-	defaultSrvZone = "gg"
+	defaultDNSZone    = "srv.glimpse.io"
+	defaultSrvZone    = "gg"
+	defaultMaxAnswers = 43 // TODO(alx): Find sane defaults.
 
 	routeLookup = `/lookup/{name:[a-z0-9\-\.]+}`
 )
@@ -27,6 +28,7 @@ func main() {
 	var (
 		consulAddr = flag.String("consul.addr", "127.0.0.1:8500", "consul lookup address")
 		dnsAddr    = flag.String("dns.addr", ":5959", "DNS address to bind to")
+		maxAnswers = flag.Int("dns.udp.maxanswers", defaultMaxAnswers, "DNS maximum answers returned via UDP")
 		dnsZone    = flag.String("dns.zone", defaultDNSZone, "DNS zone")
 		srvZone    = flag.String("srv.zone", defaultSrvZone, "srv zone")
 	)
@@ -51,7 +53,17 @@ func main() {
 		Net:  "udp",
 	}
 
-	dns.HandleFunc(".", dnsHandler(store, *srvZone, *dnsZone))
+	dns.Handle(
+		".",
+		protocolHandler(
+			*maxAnswers,
+			dnsHandler(
+				store,
+				*srvZone,
+				dns.Fqdn(*dnsZone),
+			),
+		),
+	)
 
 	log.Printf("glimpse-agent starting on %s\n", *dnsAddr)
 	log.Fatalf("DNS failed: %s", server.ListenAndServe())

@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net"
 	"strings"
 
 	"github.com/miekg/dns"
@@ -34,14 +35,15 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 
 		q = req.Question[0]
 
-		if !strings.HasSuffix(q.Name, "."+domain+".") {
+		if !strings.HasSuffix(q.Name, "."+domain) {
+			log.Printf("[warning] domain '%s' doesn't match for '%s'", domain, q.Name)
 			res.SetRcode(req, dns.RcodeNameError)
 			goto respond
 		}
 
 		// Trim domain as it is not relevant for the extraction from the
 		// service address.
-		addr = strings.TrimSuffix(q.Name, "."+domain+".")
+		addr = strings.TrimSuffix(q.Name, "."+domain)
 
 		srv, err = infoFromAddr(addr)
 		if err != nil {
@@ -89,7 +91,7 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 					Priority: 0,
 					Weight:   0,
 					Port:     ins.port,
-					Target:   ins.host + ".",
+					Target:   dns.Fqdn(ins.host),
 				}
 				res.Answer = append(res.Answer, rr)
 			}
@@ -108,7 +110,38 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 		}
 
 		// TODO(alx): Put logging in central place for control in different
-		//						environemnts.
+		//            environemnts.
 		log.Printf("query: %s %s -> %d\n", dns.TypeToString[q.Qtype], q.Name, len(res.Answer))
 	}
+}
+
+// TODO(alx): Settle on naming for handlers acting as middleware.
+func protocolHandler(maxAnswers int, next dns.Handler) dns.Handler {
+	return dns.HandlerFunc(func(w dns.ResponseWriter, r *dns.Msg) {
+		var (
+			buf      = &bufferedWriter{w, nil}
+			_, isUDP = w.RemoteAddr().(*net.UDPAddr)
+		)
+
+		next.ServeDNS(buf, r)
+
+		if isUDP && len(buf.msg.Answer) > maxAnswers {
+			buf.msg.Answer = buf.msg.Answer[:maxAnswers]
+			buf.msg.Truncated = true
+		}
+
+		w.WriteMsg(buf.msg)
+	})
+}
+
+type bufferedWriter struct {
+	dns.ResponseWriter
+
+	msg *dns.Msg
+}
+
+func (w *bufferedWriter) WriteMsg(m *dns.Msg) error {
+	w.msg = m
+
+	return nil
 }

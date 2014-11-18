@@ -30,24 +30,10 @@ const (
 	// consul-agent
 	advertise = "1.2.3.4"
 	nodeName  = "hokuspokus"
-)
 
-var config = []byte(`
-{
-	"service": {
-		"id": "goku-stream-8080",
-		"name": "goku",
-		"tags": [
-			"glimpse:provider=harpoon",
-			"glimpse:product=goku",
-			"glimpse:env=prod",
-			"glimpse:job=stream",
-			"glimpse:service=http"
-		],
-		"port": 8080
-	}
-}
-`)
+	// test data
+	srvAddr = "http.stream.prod.goku"
+)
 
 func TestAll(t *testing.T) {
 	configDir, err := ioutil.TempDir("", "config")
@@ -62,7 +48,12 @@ func TestAll(t *testing.T) {
 	}
 	defer os.RemoveAll(dataDir)
 
-	err = ioutil.WriteFile(path.Join(configDir, "test.json"), config, 0644)
+	cfg, id, err := generateConfig(fmt.Sprintf("%s.%s", srvAddr, srvZone), "harpoon", 8080)
+	if err != nil {
+		t.Fatalf("config gen failed: %s", err)
+	}
+
+	err = ioutil.WriteFile(path.Join(configDir, fmt.Sprintf("%s.json", id)), cfg, 0644)
 	if err != nil {
 		t.Fatalf("failed to write config: %s", err)
 	}
@@ -85,7 +76,7 @@ func TestAll(t *testing.T) {
 	)
 
 	// success - SRV
-	q = fmt.Sprintf("http.stream.prod.goku.%s.%s.", srvZone, dnsZone)
+	q = dns.Fqdn(fmt.Sprintf("%s.%s.%s", srvAddr, srvZone, dnsZone))
 
 	res, err := query(q, dns.TypeSRV)
 	if err != nil {
@@ -121,7 +112,7 @@ func TestAll(t *testing.T) {
 	}
 
 	// success - A
-	q = fmt.Sprintf("http.stream.prod.goku.%s.%s.", srvZone, dnsZone)
+	q = dns.Fqdn(fmt.Sprintf("%s.%s.%s", srvAddr, srvZone, dnsZone))
 
 	res, err = query(q, dns.TypeA)
 	if err != nil {
@@ -154,10 +145,10 @@ func TestAll(t *testing.T) {
 
 	// fail - non-existent DNS zone
 	for _, q := range []string{
-		"http.stream.prod.goku.",
-		fmt.Sprintf("http.stream.prod.goku.%s.", srvZone),
-		fmt.Sprintf("http.stream.prod.goku.%s.", dnsZone),
-		fmt.Sprintf("http.stream.prod.goku.%s.example.domain.", srvZone),
+		dns.Fqdn(srvAddr),
+		dns.Fqdn(fmt.Sprintf("%s.%s", srvAddr, srvZone)),
+		dns.Fqdn(fmt.Sprintf("%s.%s", srvAddr, dnsZone)),
+		dns.Fqdn(fmt.Sprintf("%s.%s.example.domain", srvAddr, srvZone)),
 	} {
 		res, err := query(q, dns.TypeSRV)
 		if err != nil {
@@ -169,6 +160,51 @@ func TestAll(t *testing.T) {
 			t.Fatalf("%s: want rcode '%s', got '%s'", q, want, got)
 		}
 	}
+}
+
+func generateConfig(addr, provider string, port int) ([]byte, string, error) {
+	info, err := infoFromAddr(addr)
+	if err != nil {
+		return nil, "", err
+	}
+
+	info.provider = provider
+
+	id := fmt.Sprintf(
+		"%s-%s-%s-%s-%d",
+		info.product,
+		info.env,
+		info.job,
+		info.service,
+		port,
+	)
+
+	return []byte(fmt.Sprintf(
+		`
+{
+	"service": {
+		"id": "%s",
+		"name": "%s",
+		"tags": [
+			"glimpse:provider=%s",
+			"glimpse:product=%s",
+			"glimpse:env=%s",
+			"glimpse:job=%s",
+			"glimpse:service=%s"
+		],
+		"port": %d
+	}
+}
+`,
+		id,
+		info.product,
+		info.provider,
+		info.product,
+		info.env,
+		info.job,
+		info.service,
+		port,
+	)), id, nil
 }
 
 func query(q string, t uint16) (*dns.Msg, error) {

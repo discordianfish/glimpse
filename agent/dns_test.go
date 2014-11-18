@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 	"reflect"
 	"testing"
@@ -11,7 +12,7 @@ import (
 
 func TestDNSHandler(t *testing.T) {
 	var (
-		domain = "srv.glimpse.io"
+		domain = dns.Fqdn("srv.glimpse.io")
 		zone   = "tt"
 
 		api = info{
@@ -81,12 +82,12 @@ func TestDNSHandler(t *testing.T) {
 		rcode    int
 	}{
 		{
-			question: fmt.Sprintf("foo.bar.baz.qux.%s.%s.", zone, domain),
+			question: fmt.Sprintf("foo.bar.baz.qux.%s.%s", zone, domain),
 			qtype:    dns.TypeSRV,
 			rcode:    dns.RcodeNameError,
 		},
 		{
-			question: fmt.Sprintf("foo.bar.baz.qux.%s.%s.", "invalid", domain),
+			question: fmt.Sprintf("foo.bar.baz.qux.%s.%s", "invalid", domain),
 			qtype:    dns.TypeSRV,
 			rcode:    dns.RcodeNameError,
 		},
@@ -101,52 +102,52 @@ func TestDNSHandler(t *testing.T) {
 			rcode:    dns.RcodeNameError,
 		},
 		{
-			question: fmt.Sprintf("http.api.prod.harpoon.%s.", zone),
+			question: fmt.Sprintf("http.api.prod.harpoon.%s", zone),
 			qtype:    dns.TypeSRV,
 			rcode:    dns.RcodeNameError,
 		},
 		{
-			question: fmt.Sprintf("http.api.prod.harpoon.%s.%s.", zone, domain),
+			question: fmt.Sprintf("http.api.prod.harpoon.%s.%s", zone, domain),
 			qtype:    dns.TypeSRV,
 			answers:  4,
 		},
 		{
-			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s.", zone, domain),
+			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
 			qtype:    dns.TypeSRV,
 			answers:  2,
 		},
 		{
-			question: fmt.Sprintf("foo.bar.baz.qux.%s.%s.", zone, domain),
+			question: fmt.Sprintf("foo.bar.baz.qux.%s.%s", zone, domain),
 			qtype:    dns.TypeA,
 			rcode:    dns.RcodeNameError,
 		},
 		{
-			question: fmt.Sprintf("http.api.prod.harpoon.%s.%s.", zone, domain),
+			question: fmt.Sprintf("http.api.prod.harpoon.%s.%s", zone, domain),
 			qtype:    dns.TypeA,
 			answers:  4,
 		},
 		{
-			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s.", zone, domain),
+			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
 			qtype:    dns.TypeA,
 			answers:  2,
 		},
 		{
-			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s.", zone, domain),
+			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
 			qtype:    dns.TypeAAAA,
 			rcode:    dns.RcodeNotImplemented,
 		},
 		{
-			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s.", zone, domain),
+			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
 			qtype:    dns.TypeMX,
 			rcode:    dns.RcodeNotImplemented,
 		},
 		{
-			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s.", zone, domain),
+			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
 			qtype:    dns.TypeNS,
 			rcode:    dns.RcodeNotImplemented,
 		},
 		{
-			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s.", zone, domain),
+			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
 			qtype:    dns.TypeTXT,
 			rcode:    dns.RcodeNotImplemented,
 		},
@@ -192,7 +193,7 @@ func TestDNSHandler(t *testing.T) {
 
 func TestDNSHandlerZeroQuestions(t *testing.T) {
 	var (
-		h = dnsHandler(&testStore{}, "tt", "test.glimpse.io")
+		h = dnsHandler(&testStore{}, "tt", dns.Fqdn("test.glimpse.io"))
 		m = &dns.Msg{}
 		w = &testWriter{}
 	)
@@ -207,7 +208,7 @@ func TestDNSHandlerZeroQuestions(t *testing.T) {
 
 func TestDNSHandlerMultiQuestions(t *testing.T) {
 	var (
-		h = dnsHandler(&testStore{}, "tt", "test.glimpse.io")
+		h = dnsHandler(&testStore{}, "tt", dns.Fqdn("test.glimpse.io"))
 		m = &dns.Msg{}
 		w = &testWriter{}
 	)
@@ -215,7 +216,7 @@ func TestDNSHandlerMultiQuestions(t *testing.T) {
 	m.Id = dns.Id()
 	m.RecursionDesired = true
 	m.Question = make([]dns.Question, 3)
-	for i, _ := range m.Question {
+	for i := range m.Question {
 		m.Question[i] = dns.Question{
 			Name:   "foo.bar.baz.",
 			Qtype:  dns.TypeA,
@@ -233,7 +234,7 @@ func TestDNSHandlerMultiQuestions(t *testing.T) {
 
 func TestDNSHandlerBrokenStore(t *testing.T) {
 	var (
-		h = dnsHandler(&brokenStore{}, "tt", "test.glimpse.io")
+		h = dnsHandler(&brokenStore{}, "tt", dns.Fqdn("test.glimpse.io"))
 		m = &dns.Msg{}
 		w = &testWriter{}
 	)
@@ -244,6 +245,46 @@ func TestDNSHandlerBrokenStore(t *testing.T) {
 
 	if want, got := dns.RcodeServerFailure, r.Rcode; want != got {
 		t.Errorf("want rcode %s, got %s", dns.RcodeToString[want], dns.RcodeToString[got])
+	}
+}
+
+func TestProtocolHandler(t *testing.T) {
+	var (
+		answers     = rand.Intn(12) + 3
+		want        = answers / 2
+		testHandler = dns.HandlerFunc(func(w dns.ResponseWriter, r *dns.Msg) {
+			res := &dns.Msg{}
+
+			for i := 0; i < answers; i++ {
+				rr := &dns.A{
+					Hdr: dns.RR_Header{
+						Name:   r.Question[0].Name,
+						Rrtype: dns.TypeA,
+						Class:  dns.ClassINET,
+						Ttl:    5,
+					},
+					A: net.ParseIP(fmt.Sprintf("1.2.3.%d", i)),
+				}
+				res.Answer = append(res.Answer, rr)
+			}
+
+			err := w.WriteMsg(res)
+			if err != nil {
+				t.Fatalf("write response failed: %s", err)
+			}
+		})
+	)
+
+	w := &testWriter{
+		remoteAddr: &net.UDPAddr{},
+	}
+	m := &dns.Msg{}
+	m.SetQuestion(dns.Fqdn("app.glimpse.io"), dns.TypeA)
+
+	protocolHandler(want, testHandler).ServeDNS(w, m)
+
+	if got := len(w.msg.Answer); want != got {
+		t.Errorf("want %d answers, got %d", want, got)
 	}
 }
 
@@ -273,7 +314,8 @@ func (s *brokenStore) getInstances(srv info) (instances, error) {
 
 // testWriter implements the dns.ResponseWriter interface.
 type testWriter struct {
-	msg *dns.Msg
+	msg        *dns.Msg
+	remoteAddr net.Addr
 }
 
 func (w *testWriter) WriteMsg(m *dns.Msg) error {
@@ -282,7 +324,7 @@ func (w *testWriter) WriteMsg(m *dns.Msg) error {
 }
 
 func (w *testWriter) LocalAddr() net.Addr         { return nil }
-func (w *testWriter) RemoteAddr() net.Addr        { return nil }
+func (w *testWriter) RemoteAddr() net.Addr        { return w.remoteAddr }
 func (w *testWriter) Write(s []byte) (int, error) { return 0, nil }
 func (w *testWriter) Close() error                { return nil }
 func (w *testWriter) TsigStatus() error           { return nil }

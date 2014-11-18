@@ -33,7 +33,6 @@ type info struct {
 	zone     string
 }
 
-// func extractSrvInfo(name, zone, domain string) (info, error) {
 func infoFromAddr(addr string) (info, error) {
 	fields := strings.SplitN(addr, ".", 5)
 
