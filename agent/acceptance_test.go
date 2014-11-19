@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -62,13 +63,27 @@ func TestAll(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consul failed: %s", err)
 	}
-	defer terminateCommand(consul)
+	defer consul.terminate()
+
+	go func() {
+		err := <-consul.errc
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	agent, err := runAgent()
 	if err != nil {
 		t.Fatalf("agent failed: %s", err)
 	}
-	defer terminateCommand(agent)
+	defer agent.terminate()
+
+	go func() {
+		err := <-agent.errc
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	var (
 		q   string
@@ -219,17 +234,28 @@ func query(q string, t uint16) (*dns.Msg, error) {
 	return res, err
 }
 
-func runAgent() (*exec.Cmd, error) {
+func runAgent() (*cmd, error) {
 	args := []string{
 		"-dns.addr", addr,
+		"-dns.udp.maxanswers", strconv.Itoa(1),
 		"-dns.zone", dnsZone,
 		"-srv.zone", srvZone,
 	}
 
-	return runCommand(".deps/glimpse-agent", args, "glimpse-agent")
+	cmd, err := runCmd(".deps/glimpse-agent", args, "glimpse-agent")
+	if err != nil {
+		return nil, err
+	}
+
+	select {
+	case <-cmd.readyc:
+		return cmd, nil
+	case err := <-cmd.errc:
+		return nil, err
+	}
 }
 
-func runConsul(configDir, dataDir string) (*exec.Cmd, error) {
+func runConsul(configDir, dataDir string) (*cmd, error) {
 	args := []string{
 		"agent",
 		"-server",
@@ -241,71 +267,138 @@ func runConsul(configDir, dataDir string) (*exec.Cmd, error) {
 		"-data-dir", dataDir,
 	}
 
-	return runCommand(".deps/consul", args, "Synced service 'goku")
+	cmd, err := runCmd(".deps/consul", args, "Synced service 'goku")
+	if err != nil {
+		return nil, err
+	}
+
+	select {
+	case <-cmd.readyc:
+		return cmd, nil
+	case err := <-cmd.errc:
+		return nil, err
+	}
 }
 
-func runCommand(name string, args []string, success string) (*exec.Cmd, error) {
-	cmd := exec.Command(name, args...)
-	out, err := cmd.StdoutPipe()
+type cmd struct {
+	cmd    *exec.Cmd
+	name   string
+	check  string
+	errc   chan error
+	readyc chan struct{}
+	args   []string
+	stdout []string
+	stderr []string
+}
+
+func runCmd(name string, args []string, check string) (*cmd, error) {
+	c := exec.Command(name, args...)
+
+	outPipe, err := c.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	errPipe, err := c.StderrPipe()
 	if err != nil {
 		return nil, err
 	}
 
 	var (
-		linec = make(chan string)
-		errc  = make(chan error)
+		stdoutc = make(chan string)
+		stderrc = make(chan string)
+		errc    = make(chan error, 3)
 	)
 
-	// TODO(alx): Better coordination of routines and proper shutdown.
-	go func(out io.ReadCloser, linec chan string, errc chan error) {
-		reader := bufio.NewReader(out)
-		for {
-			line, _, err := reader.ReadLine()
-			if err != nil {
-				if err == io.EOF {
-					continue
-				}
-				if _, ok := err.(*os.PathError); ok {
-					return
-				}
-				errc <- err
-			}
-			linec <- string(line)
-		}
-	}(out, linec, errc)
+	go readLines(outPipe, stdoutc, errc)
+	go readLines(errPipe, stderrc, errc)
 
-	err = cmd.Start()
+	err = c.Start()
 	if err != nil {
 		return nil, err
 	}
 
 	go func(cmd *exec.Cmd, errc chan error) {
 		errc <- cmd.Wait()
-	}(cmd, errc)
+	}(c, errc)
 
-	var lastLine string
+	cmd := &cmd{
+		cmd:    c,
+		name:   name,
+		args:   args,
+		check:  check,
+		errc:   make(chan error, 1),
+		readyc: make(chan struct{}),
+		stdout: []string{},
+		stderr: []string{},
+	}
+
+	go cmd.run(stdoutc, stderrc, errc)
+
+	return cmd, nil
+}
+
+func (c *cmd) run(stdoutc chan string, stderrc chan string, errc chan error) {
+	ready := false
 
 	for {
 		select {
-		case line := <-linec:
-			lastLine = line
+		case line := <-stdoutc:
+			c.stdout = append(c.stdout, line)
 
-			if strings.Contains(line, success) {
-				return cmd, nil
+			if strings.Contains(line, c.check) {
+				c.readyc <- struct{}{}
+				ready = true
 			}
+		case line := <-stderrc:
+			c.stderr = append(c.stderr, line)
 		case err := <-errc:
 			if err != nil {
-				return nil, fmt.Errorf("%s: %s", err, lastLine)
+				err = fmt.Errorf(
+					"%s failed: %s\nstdout:\n%s\nstderr:\n%s",
+					c.name,
+					err,
+					strings.Join(c.stdout, "\n"),
+					strings.Join(c.stderr, "\n"),
+				)
 			}
+			c.errc <- err
+			return
 		case <-time.After(cmdTimeout):
-			return nil, fmt.Errorf("% startup timed out: %s", name, lastLine)
+			if ready {
+				continue
+			}
+			c.errc <- fmt.Errorf(
+				"% timed out:\nstdout:\n%s\nstderr:\n%s",
+				c.name,
+				strings.Join(c.stdout, "\n"),
+				strings.Join(c.stderr, "\n"),
+			)
+			return
 		}
 	}
 }
 
-func terminateCommand(cmd *exec.Cmd) {
-	err := syscall.Kill(cmd.Process.Pid, syscall.SIGTERM)
+func (c *cmd) terminate() error {
+	err := syscall.Kill(c.cmd.Process.Pid, syscall.SIGTERM)
 	if err != nil {
-		panic(err)
+		return err
+	}
+	return nil
+}
+
+func readLines(pipe io.ReadCloser, outc chan string, errc chan error) {
+	reader := bufio.NewReader(pipe)
+	for {
+		line, _, err := reader.ReadLine()
+		if err != nil {
+			if err == io.EOF {
+				continue
+			}
+			if _, ok := err.(*os.PathError); ok {
+				return
+			}
+			errc <- err
+		}
+		outc <- string(line)
 	}
 }
