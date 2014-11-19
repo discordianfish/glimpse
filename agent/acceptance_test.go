@@ -242,7 +242,7 @@ func runAgent() (*cmd, error) {
 		"-srv.zone", srvZone,
 	}
 
-	cmd, err := runCmd(".deps/glimpse-agent", args, "glimpse-agent")
+	cmd, err := runCmd("./glimpse-agent", args, "glimpse-agent")
 	if err != nil {
 		return nil, err
 	}

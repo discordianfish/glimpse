@@ -1,5 +1,4 @@
-# TODO(alx): Fix extraction of ARCH.
-ARCH := amd64
+ARCH := $(subst x86_64,amd64,$(subst i386,386,$(shell uname -m)))
 OS   := $(subst Darwin,darwin,$(subst Linux,linux,$(shell uname)))
 
 GOBIN ?= $(firstword $(subst :, ,$(GOPATH)))/bin
@@ -16,26 +15,11 @@ CONSUL_URL := "https://dl.bintray.com/mitchellh/consul/$(CONSUL_ZIP)"
 
 default: test
 
-$(GODEP):
-	go get github.com/tools/godep
+.PHONY: build
+build: glimpse-agent
 
-$(DEPS_DIR):
-	mkdir -p $(DEPS_DIR)
-
-# TODO(alx): Move to tar base distribution.
-$(DEPS_DIR)/$(CONSUL_ZIP):
-	wget --quiet $(CONSUL_URL) -O $@
-
-$(AGENT_BIN): $(GODEP) *.go
-	$(GODEP) go build -o $@
-
-$(CONSUL_BIN): $(DEPS_DIR)/$(CONSUL_ZIP)
-	unzip -q -d $(DEPS_DIR) $<
-	@touch $@
-
-# TODO(alx): Fix dependencies.
 .PHONY: acceptance-test
-acceptance-test: $(GODEP) $(DEPS_DIR) $(AGENT_BIN) $(CONSUL_BIN)
+acceptance-test: build $(CONSUL_BIN) $(GODEP)
 	$(GODEP) go test -v -tags acceptance
 
 .PHONY: unit-test
@@ -48,5 +32,19 @@ clean:
 
 .PHONY: test
 test: unit-test acceptance-test
+
+glimpse-agent: $(GODEP) *.go
+	$(GODEP) go build -o $@
+
+$(GODEP):
+	go get github.com/tools/godep
+
+$(DEPS_DIR)/$(CONSUL_ZIP):
+	mkdir -p $(DEPS_DIR)
+	wget --quiet $(CONSUL_URL) -O $@
+
+$(CONSUL_BIN): $(DEPS_DIR)/$(CONSUL_ZIP)
+	unzip -q -d $(DEPS_DIR) $<
+	@touch $@
 
 .SUFFIXES: # Disable default suffixes
