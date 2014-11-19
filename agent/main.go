@@ -48,12 +48,8 @@ func main() {
 		client: client,
 	}
 
-	server := &dns.Server{
-		Addr: *dnsAddr,
-		Net:  "udp",
-	}
-
-	dns.Handle(
+	dnsMux := dns.NewServeMux()
+	dnsMux.Handle(
 		".",
 		protocolHandler(
 			*maxAnswers,
@@ -65,6 +61,26 @@ func main() {
 		),
 	)
 
-	log.Printf("glimpse-agent starting on %s\n", *dnsAddr)
-	log.Fatalf("DNS failed: %s", server.ListenAndServe())
+	errc := make(chan error, 1)
+
+	go runDNSServer(&dns.Server{
+		Addr:    *dnsAddr,
+		Handler: dnsMux,
+		Net:     "tcp",
+	}, errc)
+	go runDNSServer(&dns.Server{
+		Addr:    *dnsAddr,
+		Handler: dnsMux,
+		Net:     "udp",
+	}, errc)
+
+	select {
+	case err := <-errc:
+		log.Fatalf("%s", err)
+	}
+}
+
+func runDNSServer(server *dns.Server, errc chan error) {
+	log.Printf("glimpse-agent DNS/%s listening on %s\n", server.Net, server.Addr)
+	errc <- server.ListenAndServe()
 }

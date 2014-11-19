@@ -93,7 +93,7 @@ func TestAll(t *testing.T) {
 	// success - SRV
 	q = dns.Fqdn(fmt.Sprintf("%s.%s.%s", srvAddr, srvZone, dnsZone))
 
-	res, err := query(q, dns.TypeSRV)
+	res, err := query(q, dns.TypeSRV, "udp")
 	if err != nil {
 		t.Fatalf("DNS lookup failed: %s", err)
 	}
@@ -129,7 +129,7 @@ func TestAll(t *testing.T) {
 	// success - A
 	q = dns.Fqdn(fmt.Sprintf("%s.%s.%s", srvAddr, srvZone, dnsZone))
 
-	res, err = query(q, dns.TypeA)
+	res, err = query(q, dns.TypeA, "udp")
 	if err != nil {
 		t.Fatalf("DNS lookup failed: %s", err)
 	}
@@ -158,6 +158,19 @@ func TestAll(t *testing.T) {
 		t.Fatalf("want A %s, got %s", want, got)
 	}
 
+	// success - TCP
+	q = dns.Fqdn(fmt.Sprintf("%s.%s.%s", srvAddr, srvZone, dnsZone))
+
+	res, err = query(q, dns.TypeSRV, "tcp")
+	if err != nil {
+		t.Fatalf("DNS/tcp lookup failed: %s", err)
+	}
+
+	want, got = dns.RcodeToString[dns.RcodeSuccess], dns.RcodeToString[res.Rcode]
+	if want != got {
+		t.Fatalf("%s: want rcode '%s', got '%s'", q, want, got)
+	}
+
 	// fail - non-existent DNS zone
 	for _, q := range []string{
 		dns.Fqdn(srvAddr),
@@ -165,7 +178,7 @@ func TestAll(t *testing.T) {
 		dns.Fqdn(fmt.Sprintf("%s.%s", srvAddr, dnsZone)),
 		dns.Fqdn(fmt.Sprintf("%s.%s.example.domain", srvAddr, srvZone)),
 	} {
-		res, err := query(q, dns.TypeSRV)
+		res, err := query(q, dns.TypeSRV, "udp")
 		if err != nil {
 			t.Fatalf("DNS lookup failed: %s", err)
 		}
@@ -222,10 +235,12 @@ func generateConfig(addr, provider string, port int) ([]byte, string, error) {
 	)), id, nil
 }
 
-func query(q string, t uint16) (*dns.Msg, error) {
+func query(q string, t uint16, net string) (*dns.Msg, error) {
 	var (
-		c = &dns.Client{}
 		m = &dns.Msg{}
+		c = &dns.Client{
+			Net: net,
+		}
 	)
 
 	m.SetQuestion(q, t)
@@ -242,7 +257,7 @@ func runAgent() (*cmd, error) {
 		"-srv.zone", srvZone,
 	}
 
-	cmd, err := runCmd("./glimpse-agent", args, "glimpse-agent")
+	cmd, err := runCmd("./glimpse-agent", args, "udp listening")
 	if err != nil {
 		return nil, err
 	}
