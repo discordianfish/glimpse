@@ -3,11 +3,13 @@ package main
 import (
 	"flag"
 	"log"
+	"net/http"
 	"os"
 	"regexp"
 
 	"github.com/armon/consul-api"
 	"github.com/miekg/dns"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -31,6 +33,7 @@ func main() {
 		maxAnswers = flag.Int("dns.udp.maxanswers", defaultMaxAnswers, "DNS maximum answers returned via UDP")
 		dnsZone    = flag.String("dns.zone", defaultDNSZone, "DNS zone")
 		srvZone    = flag.String("srv.zone", defaultSrvZone, "srv zone")
+		httpAddr   = flag.String("http.addr", ":5960", "HTTP address to bind to")
 	)
 	flag.Parse()
 	log.SetFlags(log.Lmicroseconds | log.Lshortfile)
@@ -51,15 +54,19 @@ func main() {
 	dnsMux := dns.NewServeMux()
 	dnsMux.Handle(
 		".",
-		protocolHandler(
-			*maxAnswers,
-			dnsHandler(
-				store,
-				*srvZone,
-				dns.Fqdn(*dnsZone),
+		dnsMetricsHandler(
+			protocolHandler(
+				*maxAnswers,
+				dnsHandler(
+					store,
+					*srvZone,
+					dns.Fqdn(*dnsZone),
+				),
 			),
 		),
 	)
+
+	http.Handle("/metrics", prometheus.Handler())
 
 	errc := make(chan error, 1)
 
@@ -73,6 +80,10 @@ func main() {
 		Handler: dnsMux,
 		Net:     "udp",
 	}, errc)
+	go func(addr string, errc chan<- error) {
+		log.Printf("glimpse-agent HTTP listening on %s\n", addr)
+		errc <- http.ListenAndServe(addr, nil)
+	}(*httpAddr, errc)
 
 	select {
 	case err := <-errc:

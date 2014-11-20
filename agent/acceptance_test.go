@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"math/rand"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
@@ -25,10 +26,11 @@ const (
 	cmdTimeout = 5 * time.Second
 
 	// glimpse-agent
-	addr       = "127.0.0.1:5959"
-	dnsZone    = "test.glimpse.io"
-	srvZone    = "cz"
-	maxAnswers = 3
+	dnsAddr       = "127.0.0.1:5555"
+	dnsZone       = "test.glimpse.io"
+	dnsMaxAnswers = 3
+	httpAddr      = "127.0.0.1:5556"
+	srvZone       = "cz"
 
 	// consul-agent
 	advertise = "1.2.3.4"
@@ -44,7 +46,7 @@ var (
 		srvAddr:   "http.stream.prod.goku",
 	}
 	testCase1 = testCase{
-		instances: maxAnswers * rand.Intn(maxAnswers),
+		instances: dnsMaxAnswers * rand.Intn(dnsMaxAnswers),
 		port:      9000,
 		provider:  "bazooka",
 		srvAddr:   "http.walker.staging.roshi",
@@ -223,6 +225,27 @@ func TestAll(t *testing.T) {
 	if want, got := testCase1.instances, len(res.Answer); want != got {
 		t.Fatalf("want %d DNS result, got %d", want, got)
 	}
+
+	// success - metrics
+	m, err := http.Get(fmt.Sprintf("http://%s/metrics", httpAddr))
+	if err != nil {
+		t.Errorf("HTTP metrics request failed: %s", err)
+	}
+
+	if want, got := m.StatusCode, 200; want != got {
+		t.Errorf("want HTTP code %d, got %d", want, got)
+	}
+
+	defer m.Body.Close()
+	body, err := ioutil.ReadAll(m.Body)
+	if err != nil {
+		t.Fatalf("HTTP metrics can't read body: %s", err)
+	}
+
+	want = `glimpse_agent_dns_request_duration_microseconds_count`
+	if !strings.Contains(string(body), want) {
+		t.Errorf("want %s in HTTP body:\n%s", want, string(body))
+	}
 }
 
 type testCase struct {
@@ -287,15 +310,16 @@ func query(q string, t uint16, net string) (*dns.Msg, error) {
 
 	m.SetQuestion(q, t)
 
-	res, _, err := c.Exchange(m, addr)
+	res, _, err := c.Exchange(m, dnsAddr)
 	return res, err
 }
 
 func runAgent() (*cmd, error) {
 	args := []string{
-		"-dns.addr", addr,
-		"-dns.udp.maxanswers", strconv.Itoa(maxAnswers),
+		"-dns.addr", dnsAddr,
+		"-dns.udp.maxanswers", strconv.Itoa(dnsMaxAnswers),
 		"-dns.zone", dnsZone,
+		"-http.addr", httpAddr,
 		"-srv.zone", srvZone,
 	}
 
@@ -338,14 +362,15 @@ func runConsul(configDir, dataDir string) (*cmd, error) {
 }
 
 type cmd struct {
-	cmd    *exec.Cmd
-	name   string
-	check  string
-	errc   chan error
-	readyc chan struct{}
-	args   []string
-	stdout []string
-	stderr []string
+	cmd         *exec.Cmd
+	name        string
+	check       string
+	errc        chan error
+	readyc      chan struct{}
+	args        []string
+	stdout      []string
+	stderr      []string
+	terminating bool
 }
 
 func runCmd(name string, args []string, check string) (*cmd, error) {
@@ -394,7 +419,7 @@ func runCmd(name string, args []string, check string) (*cmd, error) {
 	return cmd, nil
 }
 
-func (c *cmd) run(stdoutc chan string, stderrc chan string, errc chan error) {
+func (c *cmd) run(stdoutc, stderrc <-chan string, errc <-chan error) {
 	ready := false
 
 	for {
@@ -409,6 +434,10 @@ func (c *cmd) run(stdoutc chan string, stderrc chan string, errc chan error) {
 		case line := <-stderrc:
 			c.stderr = append(c.stderr, line)
 		case err := <-errc:
+			if c.terminating {
+				return
+			}
+
 			if err != nil {
 				err = fmt.Errorf(
 					"%s failed: %s\nstdout:\n%s\nstderr:\n%s",
@@ -421,6 +450,9 @@ func (c *cmd) run(stdoutc chan string, stderrc chan string, errc chan error) {
 			c.errc <- err
 			return
 		case <-time.After(cmdTimeout):
+			if c.terminating {
+				return
+			}
 			if ready {
 				continue
 			}
@@ -436,6 +468,7 @@ func (c *cmd) run(stdoutc chan string, stderrc chan string, errc chan error) {
 }
 
 func (c *cmd) terminate() error {
+	c.terminating = true
 	err := syscall.Kill(c.cmd.Process.Pid, syscall.SIGTERM)
 	if err != nil {
 		return err

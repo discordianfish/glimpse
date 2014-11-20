@@ -3,12 +3,46 @@
 	"GoVersion": "go1.3.3",
 	"Deps": [
 		{
+			"ImportPath": "code.google.com/p/goprotobuf/proto",
+			"Comment": "go.r60-152",
+			"Rev": "36be16571e14f67e114bb0af619e5de2c1591679"
+		},
+		{
 			"ImportPath": "github.com/armon/consul-api",
 			"Rev": "1b81c8e0c4cbf1d382310e4c0dc11221632e79d1"
 		},
 		{
+			"ImportPath": "github.com/matttproud/golang_protobuf_extensions/ext",
+			"Rev": "f251fd0a51789b1424fde01a078fe53b26af295d"
+		},
+		{
 			"ImportPath": "github.com/miekg/dns",
 			"Rev": "dc30c7cd4ed2fc8af73d49da4ee285404958b8bd"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_golang/_vendor/goautoneg",
+			"Rev": "c53c07a719a477ad320e765b73eaaffd05d611b0"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_golang/_vendor/perks/quantile",
+			"Rev": "c53c07a719a477ad320e765b73eaaffd05d611b0"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_golang/model",
+			"Rev": "c53c07a719a477ad320e765b73eaaffd05d611b0"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_golang/prometheus",
+			"Rev": "c53c07a719a477ad320e765b73eaaffd05d611b0"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_golang/text",
+			"Rev": "c53c07a719a477ad320e765b73eaaffd05d611b0"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_model/go",
+			"Comment": "model-0.0.2-7-g775af94",
+			"Rev": "775af9440e07a658e13f699448c745367bc12115"
 		}
 	]
 }
