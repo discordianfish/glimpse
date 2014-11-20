@@ -38,6 +38,7 @@ func main() {
 	flag.Parse()
 	log.SetFlags(log.Lmicroseconds | log.Lshortfile)
 	log.SetOutput(os.Stdout)
+	log.SetPrefix("glimpse-agent ")
 
 	client, err := consulapi.NewClient(&consulapi.Config{
 		Address:    *consulAddr,
@@ -81,7 +82,7 @@ func main() {
 		Net:     "udp",
 	}, errc)
 	go func(addr string, errc chan<- error) {
-		log.Printf("glimpse-agent HTTP listening on %s\n", addr)
+		log.Printf("HTTP listening on %s\n", addr)
 		errc <- http.ListenAndServe(addr, nil)
 	}(*httpAddr, errc)
 
@@ -92,6 +93,6 @@ func main() {
 }
 
 func runDNSServer(server *dns.Server, errc chan error) {
-	log.Printf("glimpse-agent DNS/%s listening on %s\n", server.Net, server.Addr)
+	log.Printf("DNS/%s listening on %s\n", server.Net, server.Addr)
 	errc <- server.ListenAndServe()
 }
