@@ -46,7 +46,7 @@ var (
 		srvAddr:   "http.stream.prod.goku",
 	}
 	testCase1 = testCase{
-		instances: dnsMaxAnswers * rand.Intn(dnsMaxAnswers),
+		instances: dnsMaxAnswers + (rand.Intn(dnsMaxAnswers) + 1),
 		port:      9000,
 		provider:  "bazooka",
 		srvAddr:   "http.walker.staging.roshi",
