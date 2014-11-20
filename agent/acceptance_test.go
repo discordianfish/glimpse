@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path"
@@ -24,16 +25,30 @@ const (
 	cmdTimeout = 5 * time.Second
 
 	// glimpse-agent
-	addr    = "127.0.0.1:5959"
-	dnsZone = "test.glimpse.io"
-	srvZone = "cz"
+	addr       = "127.0.0.1:5959"
+	dnsZone    = "test.glimpse.io"
+	srvZone    = "cz"
+	maxAnswers = 3
 
 	// consul-agent
 	advertise = "1.2.3.4"
 	nodeName  = "hokuspokus"
+)
 
-	// test data
-	srvAddr = "http.stream.prod.goku"
+// test data
+var (
+	testCase0 = testCase{
+		instances: 1,
+		port:      8000,
+		provider:  "harpoon",
+		srvAddr:   "http.stream.prod.goku",
+	}
+	testCase1 = testCase{
+		instances: maxAnswers * rand.Intn(maxAnswers),
+		port:      9000,
+		provider:  "bazooka",
+		srvAddr:   "http.walker.staging.roshi",
+	}
 )
 
 func TestAll(t *testing.T) {
@@ -49,14 +64,21 @@ func TestAll(t *testing.T) {
 	}
 	defer os.RemoveAll(dataDir)
 
-	cfg, id, err := generateConfig(fmt.Sprintf("%s.%s", srvAddr, srvZone), "harpoon", 8080)
-	if err != nil {
-		t.Fatalf("config gen failed: %s", err)
-	}
+	for _, c := range []testCase{
+		testCase0,
+		testCase1,
+	} {
+		for i := 0; i < c.instances; i++ {
+			cfg, id, err := generateConfig(fmt.Sprintf("%s.%s", c.srvAddr, srvZone), c.provider, c.port+i)
+			if err != nil {
+				t.Fatalf("config gen failed: %s", err)
+			}
 
-	err = ioutil.WriteFile(path.Join(configDir, fmt.Sprintf("%s.json", id)), cfg, 0644)
-	if err != nil {
-		t.Fatalf("failed to write config: %s", err)
+			err = ioutil.WriteFile(path.Join(configDir, fmt.Sprintf("%s.json", id)), cfg, 0644)
+			if err != nil {
+				t.Fatalf("failed to write config: %s", err)
+			}
+		}
 	}
 
 	consul, err := runConsul(configDir, dataDir)
@@ -91,7 +113,7 @@ func TestAll(t *testing.T) {
 	)
 
 	// success - SRV
-	q = dns.Fqdn(fmt.Sprintf("%s.%s.%s", srvAddr, srvZone, dnsZone))
+	q = dns.Fqdn(fmt.Sprintf("%s.%s.%s", testCase0.srvAddr, srvZone, dnsZone))
 
 	res, err := query(q, dns.TypeSRV, "udp")
 	if err != nil {
@@ -103,7 +125,7 @@ func TestAll(t *testing.T) {
 		t.Fatalf("%s: want rcode '%s', got '%s'", q, want, got)
 	}
 
-	if want, got := 1, len(res.Answer); want != got {
+	if want, got := testCase0.instances, len(res.Answer); want != got {
 		t.Fatalf("want %d DNS result, got %d", want, got)
 	}
 
@@ -122,12 +144,12 @@ func TestAll(t *testing.T) {
 		t.Fatalf("want target %s, got %s", want, got)
 	}
 
-	if want, got := uint16(8080), srv.Port; want != got {
+	if want, got := uint16(testCase0.port), srv.Port; want != got {
 		t.Fatalf("want port %d, got %d", want, got)
 	}
 
 	// success - A
-	q = dns.Fqdn(fmt.Sprintf("%s.%s.%s", srvAddr, srvZone, dnsZone))
+	q = dns.Fqdn(fmt.Sprintf("%s.%s.%s", testCase0.srvAddr, srvZone, dnsZone))
 
 	res, err = query(q, dns.TypeA, "udp")
 	if err != nil {
@@ -139,7 +161,7 @@ func TestAll(t *testing.T) {
 		t.Fatalf("want rcode '%s', got '%s'", want, got)
 	}
 
-	if want, got := 1, len(res.Answer); want != got {
+	if want, got := testCase0.instances, len(res.Answer); want != got {
 		t.Fatalf("want %d DNS result, got %d", want, got)
 	}
 
@@ -158,25 +180,12 @@ func TestAll(t *testing.T) {
 		t.Fatalf("want A %s, got %s", want, got)
 	}
 
-	// success - TCP
-	q = dns.Fqdn(fmt.Sprintf("%s.%s.%s", srvAddr, srvZone, dnsZone))
-
-	res, err = query(q, dns.TypeSRV, "tcp")
-	if err != nil {
-		t.Fatalf("DNS/tcp lookup failed: %s", err)
-	}
-
-	want, got = dns.RcodeToString[dns.RcodeSuccess], dns.RcodeToString[res.Rcode]
-	if want != got {
-		t.Fatalf("%s: want rcode '%s', got '%s'", q, want, got)
-	}
-
 	// fail - non-existent DNS zone
 	for _, q := range []string{
-		dns.Fqdn(srvAddr),
-		dns.Fqdn(fmt.Sprintf("%s.%s", srvAddr, srvZone)),
-		dns.Fqdn(fmt.Sprintf("%s.%s", srvAddr, dnsZone)),
-		dns.Fqdn(fmt.Sprintf("%s.%s.example.domain", srvAddr, srvZone)),
+		dns.Fqdn(testCase0.srvAddr),
+		dns.Fqdn(fmt.Sprintf("%s.%s", testCase0.srvAddr, srvZone)),
+		dns.Fqdn(fmt.Sprintf("%s.%s", testCase0.srvAddr, dnsZone)),
+		dns.Fqdn(fmt.Sprintf("%s.%s.example.domain", testCase0.srvAddr, srvZone)),
 	} {
 		res, err := query(q, dns.TypeSRV, "udp")
 		if err != nil {
@@ -188,6 +197,39 @@ func TestAll(t *testing.T) {
 			t.Fatalf("%s: want rcode '%s', got '%s'", q, want, got)
 		}
 	}
+
+	// success - TCP
+	q = dns.Fqdn(fmt.Sprintf("%s.%s.%s", testCase1.srvAddr, srvZone, dnsZone))
+
+	res, err = query(q, dns.TypeSRV, "udp")
+	if err != nil {
+		t.Fatalf("DNS/udp lookup failed: %s", err)
+	}
+
+	if want, got := true, res.Truncated; want != got {
+		t.Fatalf("want msg truncated, got '%t'", got)
+	}
+
+	res, err = query(q, dns.TypeSRV, "tcp")
+	if err != nil {
+		t.Fatalf("DNS/tcp lookup failed: %s", err)
+	}
+
+	want, got = dns.RcodeToString[dns.RcodeSuccess], dns.RcodeToString[res.Rcode]
+	if want != got {
+		t.Fatalf("%s: want rcode '%s', got '%s'", q, want, got)
+	}
+
+	if want, got := testCase1.instances, len(res.Answer); want != got {
+		t.Fatalf("want %d DNS result, got %d", want, got)
+	}
+}
+
+type testCase struct {
+	instances int
+	port      int
+	provider  string
+	srvAddr   string
 }
 
 func generateConfig(addr, provider string, port int) ([]byte, string, error) {
@@ -252,7 +294,7 @@ func query(q string, t uint16, net string) (*dns.Msg, error) {
 func runAgent() (*cmd, error) {
 	args := []string{
 		"-dns.addr", addr,
-		"-dns.udp.maxanswers", strconv.Itoa(1),
+		"-dns.udp.maxanswers", strconv.Itoa(maxAnswers),
 		"-dns.zone", dnsZone,
 		"-srv.zone", srvZone,
 	}
