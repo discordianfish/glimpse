@@ -9,29 +9,55 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func dnsMetricsHandler(next dns.Handler) dns.HandlerFunc {
-	var (
-		durations = prometheus.NewSummaryVec(
-			prometheus.SummaryOpts{
-				Namespace: "glimpse_agent",
-				Subsystem: "dns",
-				Name:      "request_duration_microseconds",
-				Help:      "DNS request latencies in microseconds.",
-			},
-			[]string{"protocol", "qtype", "rcode"},
-		)
+const (
+	namespace = "glimpse_agent"
+)
+
+var (
+	dnsDurations = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace: namespace,
+			Subsystem: "dns",
+			Name:      "request_duration_microseconds",
+			Help:      "DNS request latencies in microseconds.",
+		},
+		[]string{"protocol", "qtype", "rcode"},
 	)
+	storeDurations = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace: namespace,
+			Subsystem: "consul",
+			Name:      "request_duration_microseconds",
+			Help:      "Consul API request latencies in microseconds.",
+		},
+		[]string{"service", "job", "env", "product", "zone"},
+	)
+	storeCounts = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: "consul",
+			Name:      "responses",
+			Help:      "Consul API responses.",
+		},
+		[]string{"service", "job", "env", "product", "zone"},
+	)
+)
 
-	prometheus.MustRegister(durations)
+func init() {
+	prometheus.MustRegister(dnsDurations)
+	prometheus.MustRegister(storeDurations)
+	prometheus.MustRegister(storeCounts)
+}
 
+func dnsMetricsHandler(next dns.Handler) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, req *dns.Msg) {
 		var (
 			prot  = "unknown"
 			qtype = "unknown"
 			rcode = "unknown"
 
-			b = &bufferedWriter{w, nil}
-			s = time.Now()
+			buffer = &bufferedWriter{w, nil}
+			start  = time.Now()
 		)
 
 		if _, ok := w.RemoteAddr().(*net.UDPAddr); ok {
@@ -44,14 +70,46 @@ func dnsMetricsHandler(next dns.Handler) dns.HandlerFunc {
 			qtype = strings.ToLower(dns.TypeToString[req.Question[0].Qtype])
 		}
 
-		next.ServeDNS(b, req)
+		next.ServeDNS(buffer, req)
 
-		if b.msg != nil {
-			w.WriteMsg(b.msg)
-			rcode = strings.ToLower(dns.RcodeToString[b.msg.Rcode])
+		if buffer.msg != nil {
+			w.WriteMsg(buffer.msg)
+			rcode = strings.ToLower(dns.RcodeToString[buffer.msg.Rcode])
 		}
 
-		duration := float64(time.Since(s)) / float64(time.Microsecond)
-		durations.WithLabelValues(prot, qtype, rcode).Observe(duration)
+		duration := float64(time.Since(start)) / float64(time.Microsecond)
+		dnsDurations.WithLabelValues(prot, qtype, rcode).Observe(duration)
 	}
+}
+
+type metricsStore struct {
+	next store
+}
+
+func newMetricsStore(next store) *metricsStore {
+	return &metricsStore{next: next}
+}
+
+func (s *metricsStore) getInstances(i info) (instances, error) {
+	var (
+		labels = prometheus.Labels{
+			"service": i.service,
+			"job":     i.job,
+			"env":     i.env,
+			"product": i.product,
+			"zone":    i.zone,
+		}
+		start = time.Now()
+	)
+
+	ins, err := s.next.getInstances(i)
+
+	if err == nil {
+		duration := float64(time.Since(start)) / float64(time.Microsecond)
+		storeDurations.With(labels).Observe(duration)
+		storeCounts.With(labels).Set(float64(len(ins)))
+	}
+	// TODO(ts): track errors once they are defined.
+
+	return ins, err
 }

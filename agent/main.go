@@ -48,9 +48,7 @@ func main() {
 		log.Fatalf("consul connection failed: %s", err)
 	}
 
-	store := &consulStore{
-		client: client,
-	}
+	store := newMetricsStore(newConsulStore(client))
 
 	dnsMux := dns.NewServeMux()
 	dnsMux.Handle(
