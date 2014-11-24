@@ -1,22 +1,31 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"strings"
 )
+
+var (
+	errNone        = errors.New("none")
+	errConsulAPI   = errors.New("consulAPI")
+	errInvalidIP   = errors.New("invalidIP")
+	errNoInstances = errors.New("noInstances")
+	errUntracked   = errors.New("untracked")
+)
+
+type store interface {
+	getInstances(info) (instances, error)
+}
+
+type instances []*instance
 
 type instance struct {
 	info info
 	host string
 	ip   net.IP
 	port uint16
-}
-
-type instances []*instance
-
-type store interface {
-	getInstances(info) (instances, error)
 }
 
 // TODO(alx): Find better naming.
@@ -71,4 +80,51 @@ func infoFromAddr(addr string) (info, error) {
 		service: service,
 		zone:    zone,
 	}, nil
+}
+
+func (i info) addr() string {
+	s := strings.Join([]string{i.service, i.job, i.env, i.product}, ".")
+
+	if i.zone != "" {
+		s = strings.Join([]string{s, i.zone}, ".")
+	}
+
+	return s
+}
+
+type glimpseError struct {
+	err error
+	msg string
+}
+
+func newError(err error, format string, args ...interface{}) *glimpseError {
+	return &glimpseError{
+		err: err,
+		msg: fmt.Sprintf(format, args...),
+	}
+}
+
+func (e *glimpseError) Error() string {
+	return fmt.Sprintf("%s: %s", e.err, e.msg)
+}
+
+func isConsulAPI(err error) bool {
+	return unwrapError(err) == errConsulAPI
+}
+
+func isInvalidIP(err error) bool {
+	return unwrapError(err) == errInvalidIP
+}
+
+func isNoInstances(err error) bool {
+	return unwrapError(err) == errNoInstances
+}
+
+func unwrapError(err error) error {
+	switch e := err.(type) {
+	case *glimpseError:
+		return e.err
+	}
+
+	return err
 }

@@ -31,14 +31,14 @@ func TestInfoFromAddr(t *testing.T) {
 
 func TestInfoFromAddrInvalid(t *testing.T) {
 	tests := []string{
-		"service.job.env",                     // missing fields
-		"service..env.product",                // zero-length field
-		"service.job.env.product.zone",        // zone too long
-		"service.job.env.product.zo.-.domain", // too many fields
-		"ser/vice.job.env.product",            // invalid service
-		"service.j|ob.env.product",            // invalid job
-		"service.job.e^nv.product",            // invalid env
-		"service.job.env.pro_duct",            // invalid product
+		"service.job.env",                        // missing fields
+		"service..env.product.ro",                // zero-length field
+		"service.job.env.product.zone.ro",        // zone too long
+		"service.job.env.product.zo.-.domain.ro", // too many fields
+		"ser/vice.job.env.product.ro",            // invalid service
+		"service.j|ob.env.product.ro",            // invalid job
+		"service.job.e^nv.product.ro",            // invalid env
+		"service.job.env.pro_duct.ro",            // invalid product
 	}
 
 	for _, input := range tests {

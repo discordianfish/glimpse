@@ -21,7 +21,9 @@ func TestDnsMetricsHandler(t *testing.T) {
 		}
 	})
 
-	w := &testWriter{}
+	w := &testWriter{
+		remoteAddr: &net.UDPAddr{},
+	}
 
 	m := &dns.Msg{}
 	m.SetQuestion(dns.Fqdn("app.glimpse.io"), dns.TypeA)
@@ -44,9 +46,10 @@ func TestMetricsStore(t *testing.T) {
 			zone:    "tt",
 		}
 		ins = generateInstancesFromInfo(i)
+		s   = newMetricsStore(&testStore{instances: ins})
 	)
 
-	sins, err := newMetricsStore(&testStore{instances: ins}).getInstances(i)
+	sins, err := s.getInstances(i)
 	if err != nil {
 		t.Fatalf("want store to not return an error, got %s", err)
 	}

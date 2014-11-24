@@ -33,10 +33,13 @@ func (s *consulStore) getInstances(info info) (instances, error) {
 	// TODO(alx): Check clientapi behaviour for services with falling checks.
 	nodes, _, err := s.client.Catalog().Service(info.product, jobTag, options)
 	if err != nil {
-		return nil, err
+		return nil, newError(errConsulAPI, "%s", err)
 	}
 
-	// TODO(alx): Potentially return specific error if no services were found.
+	if len(nodes) == 0 {
+		return nil, newError(errNoInstances, "found for %s", info.addr())
+	}
+
 	for _, node := range nodes {
 		var (
 			isEnv     bool
@@ -54,7 +57,7 @@ func (s *consulStore) getInstances(info info) (instances, error) {
 
 		ip := net.ParseIP(node.Address)
 		if ip == nil {
-			return nil, fmt.Errorf("IP parse failed for %s", node.Address)
+			return nil, newError(errInvalidIP, "parse failed for %s", node.Address)
 		}
 
 		if isEnv && isService {

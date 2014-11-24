@@ -14,6 +14,16 @@ const (
 )
 
 var (
+	storeLabels = []string{
+		"service",
+		"job",
+		"env",
+		"product",
+		"zone",
+		"operation",
+		"error",
+	}
+
 	dnsDurations = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace: namespace,
@@ -30,7 +40,7 @@ var (
 			Name:      "request_duration_microseconds",
 			Help:      "Consul API request latencies in microseconds.",
 		},
-		[]string{"service", "job", "env", "product", "zone"},
+		storeLabels,
 	)
 	storeCounts = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -39,7 +49,7 @@ var (
 			Name:      "responses",
 			Help:      "Consul API responses.",
 		},
-		[]string{"service", "job", "env", "product", "zone"},
+		storeLabels,
 	)
 )
 
@@ -93,23 +103,30 @@ func newMetricsStore(next store) *metricsStore {
 func (s *metricsStore) getInstances(i info) (instances, error) {
 	var (
 		labels = prometheus.Labels{
-			"service": i.service,
-			"job":     i.job,
-			"env":     i.env,
-			"product": i.product,
-			"zone":    i.zone,
+			"service":   i.service,
+			"job":       i.job,
+			"env":       i.env,
+			"product":   i.product,
+			"zone":      i.zone,
+			"operation": "getInstances",
+			"error":     errNone.Error(),
 		}
 		start = time.Now()
 	)
 
 	ins, err := s.next.getInstances(i)
-
-	if err == nil {
-		duration := float64(time.Since(start)) / float64(time.Microsecond)
-		storeDurations.With(labels).Observe(duration)
-		storeCounts.With(labels).Set(float64(len(ins)))
+	if err != nil {
+		switch e := err.(type) {
+		case *glimpseError:
+			labels["error"] = e.err.Error()
+		default:
+			labels["error"] = errUntracked.Error()
+		}
 	}
-	// TODO(ts): track errors once they are defined.
+
+	duration := float64(time.Since(start)) / float64(time.Microsecond)
+	storeDurations.With(labels).Observe(duration)
+	storeCounts.With(labels).Set(float64(len(ins)))
 
 	return ins, err
 }

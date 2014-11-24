@@ -309,7 +309,7 @@ func (s *testStore) getInstances(srv info) (instances, error) {
 type brokenStore struct{}
 
 func (s *brokenStore) getInstances(srv info) (instances, error) {
-	return nil, fmt.Errorf("could not get instances")
+	return nil, newError(errConsulAPI, "could not get instances")
 }
 
 // testWriter implements the dns.ResponseWriter interface.
