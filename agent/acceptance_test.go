@@ -143,7 +143,7 @@ func TestAll(t *testing.T) {
 	}
 
 	if want, got := testCase0.instances, len(res.Answer); want != got {
-		t.Fatalf("want %d DNS result, got %d", want, got)
+		t.Fatalf("want %d DNS result, got %d\nconsul stdout:\n%s", want, got, strings.Join(consul.stdout, "\n"))
 	}
 
 	hdr = res.Answer[0].Header()
