@@ -143,7 +143,7 @@ func TestAll(t *testing.T) {
 	}
 
 	if want, got := testCase0.instances, len(res.Answer); want != got {
-		t.Fatalf("want %d DNS result, got %d\nconsul stdout:\n%s", want, got, strings.Join(consul.stdout, "\n"))
+		t.Fatalf("want %d DNS result, got %d", want, got)
 	}
 
 	hdr = res.Answer[0].Header()
@@ -323,7 +323,7 @@ func generateConfig(addr, provider string, port int, isFailing bool) ([]byte, st
 	if isFailing {
 		s.Check = &check{
 			Script:   filepath.Join(strings.TrimSuffix(wd, "agent"), "misc", "scripts", "failing"),
-			Interval: "10ms",
+			Interval: "1s",
 		}
 	}
 
@@ -362,7 +362,7 @@ func runAgent() (*cmd, error) {
 		"-srv.zone", srvZone,
 	}
 
-	cmd, err := runCmd("./glimpse-agent", args, "udp listening")
+	cmd, err := runCmd("./glimpse-agent", args, "udp listening", 1)
 	if err != nil {
 		return nil, err
 	}
@@ -387,7 +387,7 @@ func runConsul(configDir, dataDir string) (*cmd, error) {
 		"-data-dir", dataDir,
 	}
 
-	cmd, err := runCmd(".deps/consul", args, "Synced service 'goku")
+	cmd, err := runCmd(".deps/consul", args, "is now critical", 5)
 	if err != nil {
 		return nil, err
 	}
@@ -401,18 +401,19 @@ func runConsul(configDir, dataDir string) (*cmd, error) {
 }
 
 type cmd struct {
-	cmd         *exec.Cmd
-	name        string
-	check       string
-	errc        chan error
-	readyc      chan struct{}
-	args        []string
-	stdout      []string
-	stderr      []string
-	terminating bool
+	cmd              *exec.Cmd
+	name             string
+	check            string
+	checkOccurrences int
+	errc             chan error
+	readyc           chan struct{}
+	args             []string
+	stdout           []string
+	stderr           []string
+	terminating      bool
 }
 
-func runCmd(name string, args []string, check string) (*cmd, error) {
+func runCmd(name string, args []string, check string, occur int) (*cmd, error) {
 	c := exec.Command(name, args...)
 
 	outPipe, err := c.StdoutPipe()
@@ -443,14 +444,15 @@ func runCmd(name string, args []string, check string) (*cmd, error) {
 	}(c, errc)
 
 	cmd := &cmd{
-		cmd:    c,
-		name:   name,
-		args:   args,
-		check:  check,
-		errc:   make(chan error, 1),
-		readyc: make(chan struct{}),
-		stdout: []string{},
-		stderr: []string{},
+		cmd:              c,
+		name:             name,
+		args:             args,
+		check:            check,
+		checkOccurrences: occur,
+		errc:             make(chan error, 1),
+		readyc:           make(chan struct{}),
+		stdout:           []string{},
+		stderr:           []string{},
 	}
 
 	go cmd.run(stdoutc, stderrc, errc)
@@ -459,7 +461,10 @@ func runCmd(name string, args []string, check string) (*cmd, error) {
 }
 
 func (c *cmd) run(stdoutc, stderrc <-chan string, errc <-chan error) {
-	ready := false
+	var (
+		count = 0
+		ready = false
+	)
 
 	for {
 		select {
@@ -467,6 +472,9 @@ func (c *cmd) run(stdoutc, stderrc <-chan string, errc <-chan error) {
 			c.stdout = append(c.stdout, line)
 
 			if strings.Contains(line, c.check) {
+				count++
+			}
+			if count == c.checkOccurrences {
 				c.readyc <- struct{}{}
 				ready = true
 			}
