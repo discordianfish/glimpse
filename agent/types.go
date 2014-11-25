@@ -8,7 +8,6 @@ import (
 )
 
 var (
-	errNone        = errors.New("none")
 	errConsulAPI   = errors.New("consulAPI")
 	errInvalidIP   = errors.New("invalidIP")
 	errNoInstances = errors.New("noInstances")

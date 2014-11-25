@@ -188,6 +188,7 @@ func TestAll(t *testing.T) {
 		dns.Fqdn(fmt.Sprintf("%s.%s", testCase0.srvAddr, srvZone)),
 		dns.Fqdn(fmt.Sprintf("%s.%s", testCase0.srvAddr, dnsZone)),
 		dns.Fqdn(fmt.Sprintf("%s.%s.example.domain", testCase0.srvAddr, srvZone)),
+		dns.Fqdn(fmt.Sprintf("foo.bar.baz.qux.%s.%s", srvZone, dnsZone)),
 	} {
 		res, err := query(q, dns.TypeSRV, "udp")
 		if err != nil {

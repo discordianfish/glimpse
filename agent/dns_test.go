@@ -302,6 +302,10 @@ func (s *testStore) getInstances(srv info) (instances, error) {
 		}
 	}
 
+	if len(r) == 0 {
+		return nil, newError(errNoInstances, "")
+	}
+
 	return r, nil
 }
 

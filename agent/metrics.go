@@ -109,7 +109,7 @@ func (s *metricsStore) getInstances(i info) (instances, error) {
 			"product":   i.product,
 			"zone":      i.zone,
 			"operation": "getInstances",
-			"error":     errNone.Error(),
+			"error":     "none",
 		}
 		start = time.Now()
 	)
