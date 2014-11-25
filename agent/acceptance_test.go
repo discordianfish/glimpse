@@ -4,6 +4,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -12,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -41,6 +43,7 @@ const (
 var (
 	testCase0 = testCase{
 		instances: 1,
+		failing:   1,
 		port:      8000,
 		provider:  "harpoon",
 		srvAddr:   "http.stream.prod.goku",
@@ -71,7 +74,19 @@ func TestAll(t *testing.T) {
 		testCase1,
 	} {
 		for i := 0; i < c.instances; i++ {
-			cfg, id, err := generateConfig(fmt.Sprintf("%s.%s", c.srvAddr, srvZone), c.provider, c.port+i)
+			cfg, id, err := generateConfig(fmt.Sprintf("%s.%s", c.srvAddr, srvZone), c.provider, c.port+i, false)
+			if err != nil {
+				t.Fatalf("config gen failed: %s", err)
+			}
+
+			err = ioutil.WriteFile(path.Join(configDir, fmt.Sprintf("%s.json", id)), cfg, 0644)
+			if err != nil {
+				t.Fatalf("failed to write config: %s", err)
+			}
+		}
+
+		for i := c.instances; i < c.instances+c.failing; i++ {
+			cfg, id, err := generateConfig(fmt.Sprintf("%s.%s", c.srvAddr, srvZone), c.provider, c.port+i, true)
 			if err != nil {
 				t.Fatalf("config gen failed: %s", err)
 			}
@@ -255,13 +270,14 @@ func TestAll(t *testing.T) {
 }
 
 type testCase struct {
+	failing   int
 	instances int
 	port      int
 	provider  string
 	srvAddr   string
 }
 
-func generateConfig(addr, provider string, port int) ([]byte, string, error) {
+func generateConfig(addr, provider string, port int, isFailing bool) ([]byte, string, error) {
 	info, err := infoFromAddr(addr)
 	if err != nil {
 		return nil, "", err
@@ -278,32 +294,49 @@ func generateConfig(addr, provider string, port int) ([]byte, string, error) {
 		port,
 	)
 
-	return []byte(fmt.Sprintf(
-		`
-{
-	"service": {
-		"id": "%s",
-		"name": "%s",
-		"tags": [
-			"glimpse:provider=%s",
-			"glimpse:product=%s",
-			"glimpse:env=%s",
-			"glimpse:job=%s",
-			"glimpse:service=%s"
-		],
-		"port": %d
+	type check struct {
+		Script   string `json:"script"`
+		Interval string `json:"interval"`
 	}
-}
-`,
-		id,
-		info.product,
-		info.provider,
-		info.product,
-		info.env,
-		info.job,
-		info.service,
-		port,
-	)), id, nil
+
+	type service struct {
+		ID    string   `json:"id"`
+		Name  string   `json:"name"`
+		Tags  []string `json:"tags"`
+		Port  int      `json:"port"`
+		Check *check   `json:"check,omitempty"`
+	}
+
+	s := &service{
+		ID:    id,
+		Name:  info.product,
+		Tags:  infoToTags(info),
+		Port:  port,
+		Check: nil,
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, "", err
+	}
+
+	if isFailing {
+		s.Check = &check{
+			Script:   filepath.Join(strings.TrimSuffix(wd, "agent"), "misc", "scripts", "failing"),
+			Interval: "10ms",
+		}
+	}
+
+	b, err := json.Marshal(&struct {
+		Service *service `json:"service"`
+	}{
+		Service: s,
+	})
+	if err != nil {
+		return nil, "", err
+	}
+
+	return b, id, nil
 }
 
 func query(q string, t uint16, net string) (*dns.Msg, error) {
@@ -463,7 +496,7 @@ func (c *cmd) run(stdoutc, stderrc <-chan string, errc <-chan error) {
 				continue
 			}
 			c.errc <- fmt.Errorf(
-				"% timed out:\nstdout:\n%s\nstderr:\n%s",
+				"%s timed out:\nstdout:\n%s\nstderr:\n%s",
 				c.name,
 				strings.Join(c.stdout, "\n"),
 				strings.Join(c.stderr, "\n"),
