@@ -19,10 +19,11 @@ func newConsulStore(client *consulapi.Client) store {
 
 func (s *consulStore) getInstances(info info) (instances, error) {
 	var (
-		envTag     = fmt.Sprintf("glimpse:env=%s", info.env)
-		jobTag     = fmt.Sprintf("glimpse:job=%s", info.job)
-		serviceTag = fmt.Sprintf("glimpse:service=%s", info.service)
-		options    = &consulapi.QueryOptions{
+		envTag      = fmt.Sprintf("glimpse:env=%s", info.env)
+		jobTag      = fmt.Sprintf("glimpse:job=%s", info.job)
+		serviceTag  = fmt.Sprintf("glimpse:service=%s", info.service)
+		passingOnly = true
+		options     = &consulapi.QueryOptions{
 			AllowStale: true,
 			Datacenter: info.zone,
 		}
@@ -30,23 +31,25 @@ func (s *consulStore) getInstances(info info) (instances, error) {
 		is = []*instance{}
 	)
 
-	// TODO(alx): Check clientapi behaviour for services with falling checks.
-	nodes, _, err := s.client.Catalog().Service(info.product, jobTag, options)
+	// As the default we only retrieve healthy instances. Returning different
+	// sub/super-sets should be done through different methods communicated clearly
+	// the expected response.
+	entries, _, err := s.client.Health().Service(info.product, jobTag, passingOnly, options)
 	if err != nil {
 		return nil, newError(errConsulAPI, "%s", err)
 	}
 
-	if len(nodes) == 0 {
+	if len(entries) == 0 {
 		return nil, newError(errNoInstances, "found for %s", info.addr())
 	}
 
-	for _, node := range nodes {
+	for _, e := range entries {
 		var (
 			isEnv     bool
 			isService bool
 		)
 
-		for _, tag := range node.ServiceTags {
+		for _, tag := range e.Service.Tags {
 			if tag == envTag {
 				isEnv = true
 			}
@@ -55,17 +58,17 @@ func (s *consulStore) getInstances(info info) (instances, error) {
 			}
 		}
 
-		ip := net.ParseIP(node.Address)
+		ip := net.ParseIP(e.Node.Address)
 		if ip == nil {
-			return nil, newError(errInvalidIP, "parse failed for %s", node.Address)
+			return nil, newError(errInvalidIP, "parse failed for %s", e.Node.Address)
 		}
 
 		if isEnv && isService {
 			is = append(is, &instance{
 				info: info,
-				host: node.Node,
+				host: e.Node.Node,
 				ip:   ip,
-				port: uint16(node.ServicePort),
+				port: uint16(e.Service.Port),
 			})
 		}
 	}

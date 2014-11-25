@@ -21,13 +21,18 @@ func TestConsulGetInstances(t *testing.T) {
 	if err != nil {
 		t.Fatalf("info extraction failed: %s", err)
 	}
-	result := []*consulapi.CatalogService{
-		&consulapi.CatalogService{
-			Node:        "host00.gg.local",
-			Address:     "10.2.3.4",
-			ServiceID:   "roshi-walker-8080",
-			ServiceTags: infoToTags(i),
-			ServicePort: 8080,
+	result := []*consulapi.ServiceEntry{
+		&consulapi.ServiceEntry{
+			Node: &consulapi.Node{
+				Node:    "host00.gg.local",
+				Address: "10.2.3.4",
+			},
+			Service: &consulapi.AgentService{
+				ID:      "roshi-walker-8080",
+				Service: i.product,
+				Tags:    infoToTags(i),
+				Port:    8080,
+			},
 		},
 	}
 
@@ -63,6 +68,37 @@ func TestConsulGetInstancesEmptyResult(t *testing.T) {
 	}
 }
 
+func TestConsulGetinstancesInvalidIP(t *testing.T) {
+	i, err := infoFromAddr("prometheus.walker.qa.roshi.gg")
+	if err != nil {
+		t.Fatalf("info extraction failed: %s", err)
+	}
+	result := []*consulapi.ServiceEntry{
+		&consulapi.ServiceEntry{
+			Node: &consulapi.Node{
+				Node:    "host01.gg.local",
+				Address: "3.2.1",
+			},
+			Service: &consulapi.AgentService{
+				ID:      "roshi-walker-8081",
+				Service: i.product,
+				Tags:    infoToTags(i),
+				Port:    8081,
+			},
+		},
+	}
+
+	client, server := setupStubConsul(result, t)
+	defer server.Close()
+
+	store := newConsulStore(client)
+
+	_, err = store.getInstances(i)
+	if !isInvalidIP(err) {
+		t.Fatalf("want %s, got %s", errInvalidIP, err)
+	}
+}
+
 func TestConsulGetInstancesNoConsul(t *testing.T) {
 	client, err := consulapi.NewClient(&consulapi.Config{
 		Address:    "1.2.3.4",
@@ -86,32 +122,6 @@ func TestConsulGetInstancesNoConsul(t *testing.T) {
 
 	if !isConsulAPI(err) {
 		t.Fatalf("want %s, got %s", errConsulAPI, err)
-	}
-}
-
-func TestConsulGetinstancesInvalidIP(t *testing.T) {
-	i, err := infoFromAddr("prometheus.walker.qa.roshi.gg")
-	if err != nil {
-		t.Fatalf("info extraction failed: %s", err)
-	}
-	result := []*consulapi.CatalogService{
-		&consulapi.CatalogService{
-			Node:        "host01.gg.local",
-			Address:     "3.2.1",
-			ServiceID:   "roshi-walker-8081",
-			ServiceTags: infoToTags(i),
-			ServicePort: 8081,
-		},
-	}
-
-	client, server := setupStubConsul(result, t)
-	defer server.Close()
-
-	store := newConsulStore(client)
-
-	_, err = store.getInstances(i)
-	if !isInvalidIP(err) {
-		t.Fatalf("want %s, got %s", errInvalidIP, err)
 	}
 }
 
