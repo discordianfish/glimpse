@@ -27,16 +27,17 @@ const (
 	// cmd control
 	cmdTimeout = 5 * time.Second
 
+	// consul-agent
+	advertise = "1.2.3.4"
+	consulBin = ".deps/consul"
+	nodeName  = "hokuspokus"
+
 	// glimpse-agent
 	dnsAddr       = "127.0.0.1:5555"
 	dnsZone       = "test.glimpse.io"
 	dnsMaxAnswers = 3
 	httpAddr      = "127.0.0.1:5556"
 	srvZone       = "cz"
-
-	// consul-agent
-	advertise = "1.2.3.4"
-	nodeName  = "hokuspokus"
 )
 
 // test data
@@ -355,6 +356,7 @@ func query(q string, t uint16, net string) (*dns.Msg, error) {
 
 func runAgent() (*cmd, error) {
 	args := []string{
+		"-consul.bin", consulBin,
 		"-dns.addr", dnsAddr,
 		"-dns.udp.maxanswers", strconv.Itoa(dnsMaxAnswers),
 		"-dns.zone", dnsZone,
@@ -387,7 +389,7 @@ func runConsul(configDir, dataDir string) (*cmd, error) {
 		"-data-dir", dataDir,
 	}
 
-	cmd, err := runCmd(".deps/consul", args, "is now critical", 5)
+	cmd, err := runCmd(consulBin, args, "is now critical", 5)
 	if err != nil {
 		return nil, err
 	}
