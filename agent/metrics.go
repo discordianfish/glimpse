@@ -118,9 +118,9 @@ func (s *metricsStore) getInstances(i info) (instances, error) {
 	if err != nil {
 		switch e := err.(type) {
 		case *glimpseError:
-			labels["error"] = e.err.Error()
+			labels["error"] = errToLabel[e.err]
 		default:
-			labels["error"] = errUntracked.Error()
+			labels["error"] = errToLabel[errUntracked]
 		}
 	}
 

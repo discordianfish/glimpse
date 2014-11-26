@@ -8,11 +8,18 @@ import (
 )
 
 var (
-	errConsulAPI   = errors.New("consulAPI")
-	errInvalidIP   = errors.New("invalidIP")
-	errNoInstances = errors.New("noInstances")
-	errUntracked   = errors.New("untracked")
+	errConsulAPI   = errors.New("Consul API failed")
+	errInvalidIP   = errors.New("invalid IP address")
+	errNoInstances = errors.New("no instances found")
+	errUntracked   = errors.New("untracked error")
 )
+
+var errToLabel = map[error]string{
+	errConsulAPI:   "consulapi",
+	errInvalidIP:   "invalidip",
+	errNoInstances: "noinstnaces",
+	errUntracked:   "untracked",
+}
 
 type store interface {
 	getInstances(info) (instances, error)
