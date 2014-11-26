@@ -29,6 +29,7 @@ var (
 func main() {
 	var (
 		consulAddr = flag.String("consul.addr", "127.0.0.1:8500", "consul lookup address")
+		consulBin  = flag.String("consul.bin", "consul", "location of the consul binary")
 		dnsAddr    = flag.String("dns.addr", ":5959", "DNS address to bind to")
 		maxAnswers = flag.Int("dns.udp.maxanswers", defaultMaxAnswers, "DNS maximum answers returned via UDP")
 		dnsZone    = flag.String("dns.zone", defaultDNSZone, "DNS zone")
@@ -48,7 +49,15 @@ func main() {
 		log.Fatalf("consul connection failed: %s", err)
 	}
 
-	store := newMetricsStore(newConsulStore(client))
+	var (
+		errc            = make(chan error, 1)
+		consulCollector = newConsulCollector(*consulBin, errc)
+		store           = newMetricsStore(newConsulStore(client))
+	)
+
+	prometheus.MustRegister(consulCollector)
+
+	http.Handle("/metrics", prometheus.Handler())
 
 	dnsMux := dns.NewServeMux()
 	dnsMux.Handle(
@@ -64,10 +73,6 @@ func main() {
 			),
 		),
 	)
-
-	http.Handle("/metrics", prometheus.Handler())
-
-	errc := make(chan error, 1)
 
 	go runDNSServer(&dns.Server{
 		Addr:    *dnsAddr,
