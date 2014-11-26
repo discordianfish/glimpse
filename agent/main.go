@@ -21,9 +21,7 @@ const (
 )
 
 var (
-	rDomain = regexp.MustCompile(`^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6}$`)
-	rField  = regexp.MustCompile(`^[[:alnum:]\-]+$`)
-	rZone   = regexp.MustCompile(`^[[:alnum:]]{2}$`)
+	rDNSZone = regexp.MustCompile(`^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6}$`)
 )
 
 func main() {
@@ -37,9 +35,14 @@ func main() {
 		httpAddr   = flag.String("http.addr", ":5960", "HTTP address to bind to")
 	)
 	flag.Parse()
+
 	log.SetFlags(log.Lmicroseconds | log.Lshortfile)
 	log.SetOutput(os.Stdout)
 	log.SetPrefix("glimpse-agent ")
+
+	if !rDNSZone.MatchString(*dnsZone) {
+		log.Fatalf("invalid DNS zone: %s", *dnsZone)
+	}
 
 	client, err := consulapi.NewClient(&consulapi.Config{
 		Address:    *consulAddr,

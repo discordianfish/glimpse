@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"regexp"
 	"strings"
 )
 
@@ -12,14 +13,17 @@ var (
 	errInvalidIP   = errors.New("invalid IP address")
 	errNoInstances = errors.New("no instances found")
 	errUntracked   = errors.New("untracked error")
-)
 
-var errToLabel = map[error]string{
-	errConsulAPI:   "consulapi",
-	errInvalidIP:   "invalidip",
-	errNoInstances: "noinstances",
-	errUntracked:   "untracked",
-}
+	errToLabel = map[error]string{
+		errConsulAPI:   "consulapi",
+		errInvalidIP:   "invalidip",
+		errNoInstances: "noinstances",
+		errUntracked:   "untracked",
+	}
+
+	rField = regexp.MustCompile(`^[[:alnum:]\-]+$`)
+	rZone  = regexp.MustCompile(`^[[:alnum:]]{2}$`)
+)
 
 type store interface {
 	getInstances(info) (instances, error)
