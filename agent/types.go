@@ -17,7 +17,7 @@ var (
 var errToLabel = map[error]string{
 	errConsulAPI:   "consulapi",
 	errInvalidIP:   "invalidip",
-	errNoInstances: "noinstnaces",
+	errNoInstances: "noinstances",
 	errUntracked:   "untracked",
 }
 
