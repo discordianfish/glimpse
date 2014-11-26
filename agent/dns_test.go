@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"reflect"
 	"testing"
 
 	"github.com/miekg/dns"
@@ -287,50 +286,3 @@ func TestProtocolHandler(t *testing.T) {
 		t.Errorf("want %d answers, got %d", want, got)
 	}
 }
-
-// testStore implements the glimpse.store interface.
-type testStore struct {
-	instances []*instance
-}
-
-func (s *testStore) getInstances(srv info) (instances, error) {
-	var r instances
-
-	for _, i := range s.instances {
-		if reflect.DeepEqual(srv, i.info) {
-			r = append(r, i)
-		}
-	}
-
-	if len(r) == 0 {
-		return nil, newError(errNoInstances, "")
-	}
-
-	return r, nil
-}
-
-// brokenStore implements the glimpse.store interface.
-type brokenStore struct{}
-
-func (s *brokenStore) getInstances(srv info) (instances, error) {
-	return nil, newError(errConsulAPI, "could not get instances")
-}
-
-// testWriter implements the dns.ResponseWriter interface.
-type testWriter struct {
-	msg        *dns.Msg
-	remoteAddr net.Addr
-}
-
-func (w *testWriter) WriteMsg(m *dns.Msg) error {
-	w.msg = m
-	return nil
-}
-
-func (w *testWriter) LocalAddr() net.Addr         { return nil }
-func (w *testWriter) RemoteAddr() net.Addr        { return w.remoteAddr }
-func (w *testWriter) Write(s []byte) (int, error) { return 0, nil }
-func (w *testWriter) Close() error                { return nil }
-func (w *testWriter) TsigStatus() error           { return nil }
-func (w *testWriter) TsigTimersOnly(b bool)       {}
-func (w *testWriter) Hijack()                     {}

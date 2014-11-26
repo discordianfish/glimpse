@@ -1,7 +1,6 @@
 package main
 
 import (
-	"math/rand"
 	"net"
 	"reflect"
 	"testing"
@@ -57,37 +56,4 @@ func TestMetricsStore(t *testing.T) {
 	if want, got := ins, sins; !reflect.DeepEqual(want, got) {
 		t.Errorf("want %d instances, got %d", len(want), len(got))
 	}
-}
-
-func generateInstances(addrs ...string) (instances, error) {
-	ins := instances{}
-
-	for _, addr := range addrs {
-		i, err := infoFromAddr(addr)
-		if err != nil {
-			return nil, err
-		}
-
-		ins = append(ins, generateInstancesFromInfo(i)...)
-	}
-
-	return ins, nil
-}
-
-func generateInstancesFromInfo(i info) instances {
-	var (
-		n   = rand.Intn(10) + 1
-		ins = make(instances, n)
-	)
-
-	for j := 0; j < n; j++ {
-		ins[j] = &instance{
-			info: i,
-			host: "suppenkasper",
-			ip:   net.ParseIP("1.2.3.4"),
-			port: uint16(20000 + j),
-		}
-	}
-
-	return ins
 }

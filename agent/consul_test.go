@@ -1,11 +1,7 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
-	"net/http/httptest"
-	"net/url"
 	"testing"
 	"time"
 
@@ -140,55 +136,3 @@ func TestConsulGetInstancesNoConsul(t *testing.T) {
 }
 
 // TODO(alx): Test services with non-matching env/service, hence filtering in getInstances.
-
-func createServiceEntry(
-	i info,
-	port int,
-	host, ip string,
-	checks []*consulapi.HealthCheck,
-) *consulapi.ServiceEntry {
-	return &consulapi.ServiceEntry{
-		Node: &consulapi.Node{
-			Node:    host,
-			Address: ip,
-		},
-		Service: &consulapi.AgentService{
-			ID:      fmt.Sprintf("%s-%s-%d", i.product, i.job, port),
-			Service: i.product,
-			Tags:    infoToTags(i),
-			Port:    port,
-		},
-		Checks: checks,
-	}
-}
-
-func setupStubConsul(
-	result interface{},
-	t *testing.T,
-) (*consulapi.Client, *httptest.Server) {
-	server := httptest.NewServer(
-		http.HandlerFunc(
-			func(w http.ResponseWriter, r *http.Request) {
-				err := json.NewEncoder(w).Encode(result)
-				if err != nil {
-					t.Fatalf("encoding response failed: %s", err)
-				}
-			},
-		),
-	)
-
-	url, err := url.Parse(server.URL)
-	if err != nil {
-		t.Fatalf("server url parse failed: %s", err)
-	}
-
-	client, err := consulapi.NewClient(&consulapi.Config{
-		Address:    url.Host,
-		Datacenter: defaultSrvZone,
-	})
-	if err != nil {
-		t.Fatalf("consul setup failed: %s", err)
-	}
-
-	return client, server
-}
