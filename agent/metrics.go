@@ -129,8 +129,8 @@ func (c *consulCollector) Describe(descc chan<- *prometheus.Desc) {
 	err := c.updateMetrics()
 	if err != nil {
 		// TODO(alx): prometheus.MustRegister will report an unrelated error if we
-		//						just bubble up here, instead we panic. This needs to be
-		//						addressed.
+		//            just bubble up here, instead we panic. This needs to be
+		//            addressed.
 		panic(err)
 	}
 
