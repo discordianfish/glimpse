@@ -91,7 +91,7 @@ func TestDNSHandler(t *testing.T) {
 			rcode:    dns.RcodeNameError,
 		},
 		{
-			question: "http.api.prod.harpoon.%s.%s.",
+			question: "http.api.prod.harpoon.",
 			qtype:    dns.TypeSRV,
 			rcode:    dns.RcodeNameError,
 		},
@@ -101,7 +101,7 @@ func TestDNSHandler(t *testing.T) {
 			rcode:    dns.RcodeNameError,
 		},
 		{
-			question: fmt.Sprintf("http.api.prod.harpoon.%s", zone),
+			question: fmt.Sprintf("http.api.prod.harpoon.%s.", zone),
 			qtype:    dns.TypeSRV,
 			rcode:    dns.RcodeNameError,
 		},

@@ -39,7 +39,7 @@ func main() {
 	)
 	flag.Parse()
 
-	log.SetFlags(log.Lmicroseconds | log.Lshortfile)
+	log.SetFlags(log.Lmicroseconds)
 	log.SetOutput(os.Stdout)
 	log.SetPrefix("glimpse-agent ")
 
@@ -47,6 +47,7 @@ func main() {
 		log.Fatalf("invalid DNS zone: %s", *dnsZone)
 	}
 
+	log.Printf("[info] glimpse-agent starting. v%s", version)
 	client, err := consulapi.NewClient(&consulapi.Config{
 		Address:    *consulAddr,
 		Datacenter: *srvZone,
@@ -91,7 +92,7 @@ func main() {
 		Net:     "udp",
 	}, errc)
 	go func(addr string, errc chan<- error) {
-		log.Printf("HTTP listening on %s\n", addr)
+		log.Printf("[info] HTTP listening on %s\n", addr)
 		errc <- http.ListenAndServe(addr, nil)
 	}(*httpAddr, errc)
 
@@ -102,6 +103,6 @@ func main() {
 }
 
 func runDNSServer(server *dns.Server, errc chan error) {
-	log.Printf("DNS/%s listening on %s\n", server.Net, server.Addr)
+	log.Printf("[info] DNS/%s listening on %s\n", server.Net, server.Addr)
 	errc <- server.ListenAndServe()
 }
