@@ -128,10 +128,8 @@ func (c *consulCollector) Collect(metricc chan<- prometheus.Metric) {
 func (c *consulCollector) Describe(descc chan<- *prometheus.Desc) {
 	err := c.updateMetrics()
 	if err != nil {
-		// TODO(alx): prometheus.MustRegister will report an unrelated error if we
-		//            just bubble up here, instead we panic. This needs to be
-		//            addressed.
-		panic(err)
+		c.errc <- err
+		return
 	}
 
 	for _, m := range c.metrics {

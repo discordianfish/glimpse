@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"time"
 
 	"github.com/armon/consul-api"
 	"github.com/miekg/dns"
@@ -57,12 +58,9 @@ func main() {
 	}
 
 	var (
-		errc            = make(chan error, 1)
-		consulCollector = newConsulCollector(*consulBin, errc)
-		store           = newMetricsStore(newConsulStore(client))
+		errc  = make(chan error, 1)
+		store = newMetricsStore(newConsulStore(client))
 	)
-
-	prometheus.MustRegister(consulCollector)
 
 	http.Handle("/metrics", prometheus.Handler())
 
@@ -95,14 +93,32 @@ func main() {
 		log.Printf("[info] HTTP listening on %s\n", addr)
 		errc <- http.ListenAndServe(addr, nil)
 	}(*httpAddr, errc)
+	go registerConculCollector(*consulBin, errc)
 
-	select {
-	case err := <-errc:
-		log.Fatalf("%s", err)
+	for {
+		select {
+		case err := <-errc:
+			log.Printf("[error] prometheus - collect failed: %s", err)
+		}
 	}
 }
 
 func runDNSServer(server *dns.Server, errc chan error) {
 	log.Printf("[info] DNS/%s listening on %s\n", server.Net, server.Addr)
 	errc <- server.ListenAndServe()
+}
+
+func registerConculCollector(consulBin string, errc chan error) {
+	c := newConsulCollector(consulBin, errc)
+
+	for {
+		if _, err := prometheus.Register(c); err != nil {
+			log.Printf("[error] prometheus - could not register collector"+
+				" (-consul.bin=%s)", consulBin)
+			<-time.After(1 * time.Second)
+			continue
+		}
+
+		break
+	}
 }

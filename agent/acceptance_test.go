@@ -58,48 +58,7 @@ var (
 )
 
 func TestAll(t *testing.T) {
-	configDir, err := ioutil.TempDir("", "config")
-	if err != nil {
-		t.Fatalf("failed to create consul data dir: %s", err)
-	}
-	defer os.RemoveAll(configDir)
-
-	dataDir, err := ioutil.TempDir("", "data")
-	if err != nil {
-		t.Fatalf("failed to create consul data dir: %s", err)
-	}
-	defer os.RemoveAll(dataDir)
-
-	for _, c := range []testCase{
-		testCase0,
-		testCase1,
-	} {
-		for i := 0; i < c.instances; i++ {
-			cfg, id, err := generateConfig(fmt.Sprintf("%s.%s", c.srvAddr, srvZone), c.provider, c.port+i, false)
-			if err != nil {
-				t.Fatalf("config gen failed: %s", err)
-			}
-
-			err = ioutil.WriteFile(path.Join(configDir, fmt.Sprintf("%s.json", id)), cfg, 0644)
-			if err != nil {
-				t.Fatalf("failed to write config: %s", err)
-			}
-		}
-
-		for i := c.instances; i < c.instances+c.failing; i++ {
-			cfg, id, err := generateConfig(fmt.Sprintf("%s.%s", c.srvAddr, srvZone), c.provider, c.port+i, true)
-			if err != nil {
-				t.Fatalf("config gen failed: %s", err)
-			}
-
-			err = ioutil.WriteFile(path.Join(configDir, fmt.Sprintf("%s.json", id)), cfg, 0644)
-			if err != nil {
-				t.Fatalf("failed to write config: %s", err)
-			}
-		}
-	}
-
-	consul, err := runConsul(configDir, dataDir)
+	consul, err := runConsul()
 	if err != nil {
 		t.Fatalf("consul failed: %s", err)
 	}
@@ -270,6 +229,14 @@ func TestAll(t *testing.T) {
 	}
 }
 
+func TestAgentMissingConsul(t *testing.T) {
+	a, err := runAgent()
+	if err != nil {
+		t.Fatalf("want agent to run without consul-agent: %s", err)
+	}
+	a.terminate()
+}
+
 type testCase struct {
 	failing   int
 	instances int
@@ -278,7 +245,7 @@ type testCase struct {
 	srvAddr   string
 }
 
-func generateConfig(addr, provider string, port int, isFailing bool) ([]byte, string, error) {
+func generateServicesConfig(addr, provider string, port int, isFailing bool) ([]byte, string, error) {
 	info, err := infoFromAddr(addr)
 	if err != nil {
 		return nil, "", err
@@ -377,7 +344,48 @@ func runAgent() (*cmd, error) {
 	}
 }
 
-func runConsul(configDir, dataDir string) (*cmd, error) {
+func runConsul() (*cmd, error) {
+	configDir, err := ioutil.TempDir("", "config")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create consul data dir: %s", err)
+	}
+	defer os.RemoveAll(configDir)
+
+	dataDir, err := ioutil.TempDir("", "data")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create consul data dir: %s", err)
+	}
+	defer os.RemoveAll(dataDir)
+
+	for _, c := range []testCase{
+		testCase0,
+		testCase1,
+	} {
+		for i := 0; i < c.instances; i++ {
+			cfg, id, err := generateServicesConfig(fmt.Sprintf("%s.%s", c.srvAddr, srvZone), c.provider, c.port+i, false)
+			if err != nil {
+				return nil, fmt.Errorf("config gen failed: %s", err)
+			}
+
+			err = ioutil.WriteFile(path.Join(configDir, fmt.Sprintf("%s.json", id)), cfg, 0644)
+			if err != nil {
+				return nil, fmt.Errorf("failed to write config: %s", err)
+			}
+		}
+
+		for i := c.instances; i < c.instances+c.failing; i++ {
+			cfg, id, err := generateServicesConfig(fmt.Sprintf("%s.%s", c.srvAddr, srvZone), c.provider, c.port+i, true)
+			if err != nil {
+				return nil, fmt.Errorf("config gen failed: %s", err)
+			}
+
+			err = ioutil.WriteFile(path.Join(configDir, fmt.Sprintf("%s.json", id)), cfg, 0644)
+			if err != nil {
+				return nil, fmt.Errorf("failed to write config: %s", err)
+			}
+		}
+	}
+
 	args := []string{
 		"agent",
 		"-server",
@@ -506,7 +514,7 @@ func (c *cmd) run(stdoutc, stderrc <-chan string, errc <-chan error) {
 				continue
 			}
 			c.errc <- fmt.Errorf(
-				"%s timed out:\nstdout:\n%s\nstderr:\n%s",
+				"%s timed out\nstdout:\n%s\nstderr:\n%s",
 				c.name,
 				strings.Join(c.stdout, "\n"),
 				strings.Join(c.stderr, "\n"),
