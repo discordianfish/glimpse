@@ -1,4 +1,4 @@
-# Glimpse
+# Glimpse [![Build][1]][2] [![Coverage][3]][4]
 
 Glimpse is a **Service Discovery** platform build around srv tuples which provides service topology information hierarchically ordered by products and can optionally sliced into zones for isolation. Services can discover each other via the DNS or HTTP interface and decide based on the health information how to interact.
 
@@ -10,6 +10,11 @@ The current implementation uses [Consul](https://www.consul.io/) as the backing 
 * failure detection on host and service level
 * functional HTTP API
 * simple configuration
+
+[1]: https://circleci.com/gh/soundcloud/glimpse/tree/master.svg?style=svg
+[2]: https://circleci.com/gh/soundcloud/glimpse/tree/master
+[3]: https://img.shields.io/coveralls/soundcloud/glimpse.svg
+[4]: https://coveralls.io/r/soundcloud/glimpse?branch=master
 
 # API
 
