@@ -21,6 +21,9 @@ const (
 )
 
 var (
+	// ldflag
+	version = "0.0.0.dev"
+
 	rDNSZone = regexp.MustCompile(`^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6}$`)
 )
 

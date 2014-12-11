@@ -15,14 +15,18 @@ AGENT_BIN := glimpse-agent
 AGENT_VER := 0.1.0
 AGENT_TAR := $(AGENT_BIN)-$(AGENT_VER)_$(OS)_$(ARCH).tar.gz
 AGENT_DST ?= http://ent/iss/glimpse
+AGENT_FLG := -ldflags " -X main.version $(AGENT_VER)"
 
 
 default: test
 
 build: $(AGENT_BIN)
 
+try: build
+	@./$(AGENT_BIN)
+
 clean:
-	git clean -fdx
+	rm -f $(AGENT_BIN)
 
 test: unit-test acceptance-test
 
@@ -36,11 +40,11 @@ release: $(AGENT_TAR)
 	curl -X POST --data-binary @$< $(AGENT_DST)/$<
 
 
-.PHONY: build clean test unit-test acceptance-test release
+.PHONY: build try clean test unit-test acceptance-test release
 .SUFFIXES: # Disable default suffixes
 
 $(AGENT_BIN): $(GODEP) *.go
-	$(GODEP) go build -o $@
+	$(GODEP) go build $(AGENT_FLG) -o $@
 
 $(AGENT_TAR): $(AGENT_BIN)
 	tar czf $@ $<
