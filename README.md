@@ -2,7 +2,7 @@
 
 Glimpse is a **Service Discovery** platform build around srv tuples which provides service topology information hierarchically ordered by products and can optionally sliced into zones for isolation. Services can discover each other via the DNS or HTTP interface and decide based on the health information how to interact.
 
-Glimpse tries to offer ease of integration from scheduling platforms by offering the concept of a provider. The surface for the provider is deliberately scoped on the host to limit the state both systems have to reason about to lowest common denominator.
+Glimpse tries to offer ease of integration for scheduling platforms by offering the concept of a provider. The surface for the provider is deliberately scoped on the host to limit the state both systems have to reason about to the lowest common denominator.
 
 The current implementation uses [Consul](https://www.consul.io/) as the backing service and the architecture of Glimpse itself is heavily influenced by it. Consul was chosen for it’s:
 
