@@ -21,23 +21,27 @@
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/_vendor/goautoneg",
-			"Rev": "c53c07a719a477ad320e765b73eaaffd05d611b0"
+			"Rev": "00ac06f6605fc9ac0acca709c5394cc6122278f6"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/_vendor/perks/quantile",
-			"Rev": "c53c07a719a477ad320e765b73eaaffd05d611b0"
+			"Rev": "00ac06f6605fc9ac0acca709c5394cc6122278f6"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/model",
-			"Rev": "c53c07a719a477ad320e765b73eaaffd05d611b0"
+			"Rev": "00ac06f6605fc9ac0acca709c5394cc6122278f6"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_golang/procfs",
+			"Rev": "00ac06f6605fc9ac0acca709c5394cc6122278f6"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/prometheus",
-			"Rev": "c53c07a719a477ad320e765b73eaaffd05d611b0"
+			"Rev": "00ac06f6605fc9ac0acca709c5394cc6122278f6"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/text",
-			"Rev": "c53c07a719a477ad320e765b73eaaffd05d611b0"
+			"Rev": "00ac06f6605fc9ac0acca709c5394cc6122278f6"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_model/go",
