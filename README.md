@@ -1,10 +1,5 @@
 # Glimpse [![Build][1]][2] [![Coverage][3]][4]
 
-[1]: https://circleci.com/gh/soundcloud/glimpse/tree/master.svg?style=svg
-[2]: https://circleci.com/gh/soundcloud/glimpse/tree/master
-[3]: https://img.shields.io/coveralls/soundcloud/glimpse.svg
-[4]: https://coveralls.io/r/soundcloud/glimpse?branch=master
-
 Glimpse is a **Service Discovery** platform, build around SRV tuples, which provides service topology information, hierarchically ordered by products, and can optionally sliced into zones for isolation. Services can discover each other via the DNS or HTTP interfaces, and decide based on the health information how to interact.
 
 Glimpse tries to offer ease of integration by offering the concept of a **provider**. Providers are host-local entities which feed service information into Glimpse. The surface for the provider is deliberately scoped to the host, to limit the state both systems have to reason about.
@@ -79,3 +74,8 @@ Unbound keeps the same responsibilities described above. Additionally, the glimp
 ## Development
 
 Run `make setup` to install all necessary dependencies and pre-commit hooks.
+
+[1]: https://circleci.com/gh/soundcloud/glimpse/tree/master.svg?style=svg
+[2]: https://circleci.com/gh/soundcloud/glimpse/tree/master
+[3]: https://img.shields.io/coveralls/soundcloud/glimpse.svg
+[4]: https://coveralls.io/r/soundcloud/glimpse?branch=master
