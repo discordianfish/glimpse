@@ -48,23 +48,33 @@ This architecture supports the needs inside of a single zone. Cross-zone request
 
 ## Overview
 
-![Overview](http://i.imgur.com/SMZ4bPs.png)
+![Overview](http://i.imgur.com/elE3V3H.png)
 
 ## Current Host Interactions
 
-Every provider atomically writes out a services configuration file, representing the entire state known to him, scoped to the host. The write is followed by a reload of the local consul-agent, which is configured to read all configuration files from the directory known to the providers. Partial (delta) updates are avoided, to simplify provider logic.
+Several components coexist on each individual host in the infrastructure.
 
-Unbound is the main entry point for all DNS interaction on the host. It runs with a configured stub zone pointing to the local glimpse-agent, which will answer all SRV and A queries by talking to the consul-agent HTTP API.
+![Host components](http://i.imgur.com/1Eb0QSb.png)
 
-![Current Host Interactions](http://i.imgur.com/Z2LcDsR.png)
+To update the topology, every provider atomically writes out a services configuration file, representing the entire state known to it, scoped to the host. The write is followed by a reload of the local consul-agent, which is configured to read all configuration files from the directory known to the providers. Partial (delta) updates are avoided, to simplify provider logic. The configuration (topology) information is propegated to the rest of the infrastructure through the server ring.
 
-## Potential Host Interactions
+![Config flow](http://i.imgur.com/3ohBadj.png)
+
+To service requests, unbound remains the main entry point for all DNS interaction. It runs with a configured stub zone pointing to the local glimpse-agent, which will answer all SRV and A queries by talking to the consul-agent HTTP API. Requests flow through components on a single host, and generally escaping the host to reach the zone-local server ring.
+
+![Request flow](http://i.imgur.com/lHBZQQj.png)
+
+Responses follow the same path back to the client.
+
+![Response flow](http://i.imgur.com/NTVFPUP.png)
+
+## Future Host Interactions
 
 In the future, each provider will be able to call the glimpse-agent HTTP API (described in the [API section](#api)) to update known instances. When the call completes successfully, the caller can expect the information is persisted, and being propegated throughout the global infrastructure.
 
 Unbound keeps the same responsibilities described above. Additionally, the glimpse-agent will offer an HTTP interface with the same functionality as the DNS interface, and potentially more complex query options, including subscription semantics for passive discovery. Please refer to the [API section](#api) for more information.
 
-![Potential Host Interactions](http://i.imgur.com/8NCrMyv.png)
+![Future host interactions](http://i.imgur.com/YRHA8EG.png)
 
 ## Development
 
