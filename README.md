@@ -17,7 +17,7 @@ The current implementation uses [Consul](https://www.consul.io/) as the backing 
 
 The DNS interface expects an `SRV address` and offers:
 
-- SRV: and A records and expects an srv address:
+- SRV:
 ```
 query:
 <service>.<job>.<env>.<product>.<zone>.<dns_zone>.
