@@ -21,11 +21,11 @@ func NewGoCollector() *goCollector {
 
 // Describe returns all descriptions of the collector.
 func (c *goCollector) Describe(ch chan<- *Desc) {
-	c.goroutines.Describe(ch)
+	ch <- c.goroutines.Desc()
 }
 
 // Collect returns the current state of all metrics of the collector.
 func (c *goCollector) Collect(ch chan<- Metric) {
 	c.goroutines.Set(float64(runtime.NumGoroutine()))
-	c.goroutines.Collect(ch)
+	ch <- c.goroutines
 }

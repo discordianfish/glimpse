@@ -169,10 +169,10 @@ func (mux *ServeMux) HandleRemove(pattern string) {
 // is sought.
 // If no handler is found a standard SERVFAIL message is returned
 // If the request message does not have exactly one question in the
-// question section a SERVFAIL is returned.
+// question section a SERVFAIL is returned, unlesss Unsafe is true.
 func (mux *ServeMux) ServeDNS(w ResponseWriter, request *Msg) {
 	var h Handler
-	if len(request.Question) != 1 {
+	if len(request.Question) < 1 { // allow more than one question
 		h = failedHandler()
 	} else {
 		if h = mux.match(request.Question[0].Name, request.Question[0].Qtype); h == nil {
@@ -220,6 +220,11 @@ type Server struct {
 	IdleTimeout func() time.Duration
 	// Secret(s) for Tsig map[<zonename>]<base64 secret>.
 	TsigSecret map[string]string
+	// Unsafe instructs the server to disregard any sanity checks and directly hand the message to
+	// the handler. It will specfically not check if the query has the QR bit not set.
+	Unsafe bool
+	// If NotifyStartedFunc is set is is called, once the server has started listening. 
+	NotifyStartedFunc func()
 
 	// For graceful shutdown.
 	stopUDP chan bool
@@ -286,9 +291,6 @@ func (srv *Server) ActivateAndServe() error {
 	srv.stopUDP, srv.stopTCP = make(chan bool), make(chan bool)
 	srv.started = true
 	srv.lock.Unlock()
-	if srv.UDPSize == 0 {
-		srv.UDPSize = MinMsgSize
-	}
 	if srv.PacketConn != nil {
 		if srv.UDPSize == 0 {
 			srv.UDPSize = MinMsgSize
@@ -370,6 +372,11 @@ func (srv *Server) getReadTimeout() time.Duration {
 // Each request is handled in a seperate goroutine.
 func (srv *Server) serveTCP(l *net.TCPListener) error {
 	defer l.Close()
+
+	if srv.NotifyStartedFunc != nil {
+		srv.NotifyStartedFunc()
+	}
+
 	handler := srv.Handler
 	if handler == nil {
 		handler = DefaultServeMux
@@ -400,6 +407,10 @@ func (srv *Server) serveTCP(l *net.TCPListener) error {
 // Each request is handled in a seperate goroutine.
 func (srv *Server) serveUDP(l *net.UDPConn) error {
 	defer l.Close()
+
+	if srv.NotifyStartedFunc != nil {
+		srv.NotifyStartedFunc()
+	}
 
 	handler := srv.Handler
 	if handler == nil {
@@ -445,7 +456,7 @@ Redo:
 		w.WriteMsg(x)
 		goto Exit
 	}
-	if req.Response {
+	if !srv.Unsafe && req.Response {
 		goto Exit
 	}
 

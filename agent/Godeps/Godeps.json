@@ -1,52 +1,82 @@
 {
 	"ImportPath": "github.com/soundcloud/glimpse/agent",
-	"GoVersion": "go1.3.3",
+	"GoVersion": "go1.4",
 	"Deps": [
 		{
 			"ImportPath": "code.google.com/p/goprotobuf/proto",
-			"Comment": "go.r60-152",
-			"Rev": "36be16571e14f67e114bb0af619e5de2c1591679"
+			"Comment": "go.r60-163",
+			"Rev": "9352842ae63ee1d7e74e074ce7bb10370c4b6b9e"
 		},
 		{
 			"ImportPath": "github.com/armon/consul-api",
-			"Rev": "1b81c8e0c4cbf1d382310e4c0dc11221632e79d1"
+			"Rev": "74cc5bab614dfecd6fe4ee5975b6ac97d2abc672"
+		},
+		{
+			"ImportPath": "github.com/armon/go-radix",
+			"Rev": "e39d623f12e8e41c7b5529e9a9dd67a1e2261f80"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/consul/acl",
+			"Comment": "v0.4.1-188-g9c92ea5",
+			"Rev": "9c92ea5bcbc43a4ba2b5e6fd9df168d091a38b0f"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/consul/consul/structs",
+			"Comment": "v0.4.1-188-g9c92ea5",
+			"Rev": "9c92ea5bcbc43a4ba2b5e6fd9df168d091a38b0f"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/go-msgpack/codec",
+			"Rev": "71c2886f5a673a35f909803f38ece5810165097b"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/go-multierror",
+			"Rev": "f8232e9c3137ba2e67ffee882e50398cf9135abf"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/golang-lru",
+			"Rev": "253b2dc1ca8bae42c3b5b6e53dd2eab1a7551116"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/hcl",
+			"Rev": "e37b5bd61b651c9fbf4548fc41b83e4f3d91dad0"
 		},
 		{
 			"ImportPath": "github.com/matttproud/golang_protobuf_extensions/ext",
-			"Rev": "f251fd0a51789b1424fde01a078fe53b26af295d"
+			"Rev": "7a864a042e844af638df17ebbabf8183dace556a"
 		},
 		{
 			"ImportPath": "github.com/miekg/dns",
-			"Rev": "dc30c7cd4ed2fc8af73d49da4ee285404958b8bd"
+			"Rev": "3f504e8dabd5d562e997d19ce0200aa41973e1b2"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/_vendor/goautoneg",
-			"Rev": "00ac06f6605fc9ac0acca709c5394cc6122278f6"
+			"Rev": "d1beff15235366370105c8e124e363ec80184334"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/_vendor/perks/quantile",
-			"Rev": "00ac06f6605fc9ac0acca709c5394cc6122278f6"
+			"Rev": "d1beff15235366370105c8e124e363ec80184334"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/model",
-			"Rev": "00ac06f6605fc9ac0acca709c5394cc6122278f6"
-		},
-		{
-			"ImportPath": "github.com/prometheus/client_golang/procfs",
-			"Rev": "00ac06f6605fc9ac0acca709c5394cc6122278f6"
+			"Rev": "d1beff15235366370105c8e124e363ec80184334"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/prometheus",
-			"Rev": "00ac06f6605fc9ac0acca709c5394cc6122278f6"
+			"Rev": "d1beff15235366370105c8e124e363ec80184334"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/text",
-			"Rev": "00ac06f6605fc9ac0acca709c5394cc6122278f6"
+			"Rev": "d1beff15235366370105c8e124e363ec80184334"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_model/go",
 			"Comment": "model-0.0.2-7-g775af94",
 			"Rev": "775af9440e07a658e13f699448c745367bc12115"
+		},
+		{
+			"ImportPath": "github.com/prometheus/procfs",
+			"Rev": "df086cfeee8ade2336bf504597fd657b09962dcb"
 		}
 	]
 }

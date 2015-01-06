@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/prometheus/client_golang/procfs"
+	"github.com/prometheus/procfs"
 )
 
 func TestProcessCollector(t *testing.T) {
@@ -18,7 +18,8 @@ func TestProcessCollector(t *testing.T) {
 
 	registry := newRegistry()
 	registry.Register(NewProcessCollector(os.Getpid(), ""))
-	registry.Register(NewProcessCollector(os.Getpid(), "foobar"))
+	registry.Register(NewProcessCollectorPIDFn(
+		func() int { return os.Getpid() }, "foobar"))
 
 	s := httptest.NewServer(InstrumentHandler("prometheus", registry))
 	defer s.Close()
