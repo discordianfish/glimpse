@@ -1,0 +1,4 @@
+glimpse-agent
+glimpse-agent-*.tar.gz
+.build
+.deps
