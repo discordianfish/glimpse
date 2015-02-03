@@ -208,7 +208,7 @@ func TestAll(t *testing.T) {
 		t.Errorf("HTTP metrics request failed: %s", err)
 	}
 
-	if want, got := m.StatusCode, 200; want != got {
+	if want, got := 200, m.StatusCode; want != got {
 		t.Errorf("want HTTP code %d, got %d", want, got)
 	}
 
@@ -222,6 +222,8 @@ func TestAll(t *testing.T) {
 		`glimpse_agent_dns_request_duration_microseconds_count`,
 		`glimpse_agent_consul_request_duration_microseconds_count`,
 		`glimpse_agent_consul_responses`,
+		`process_open_fds`,
+		`consul_process_open_fds`,
 	} {
 		if !strings.Contains(string(body), metric) {
 			t.Errorf("want %s in HTTP body:\n%s", metric, string(body))

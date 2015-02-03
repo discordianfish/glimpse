@@ -93,7 +93,7 @@ func main() {
 		log.Printf("[info] HTTP listening on %s\n", addr)
 		errc <- http.ListenAndServe(addr, nil)
 	}(*httpAddr, errc)
-	go registerConculCollector(*consulBin, errc)
+	go registerConsulCollector(*consulBin, errc)
 
 	for {
 		select {
@@ -108,7 +108,7 @@ func runDNSServer(server *dns.Server, errc chan error) {
 	errc <- server.ListenAndServe()
 }
 
-func registerConculCollector(consulBin string, errc chan error) {
+func registerConsulCollector(consulBin string, errc chan error) {
 	c := newConsulCollector(consulBin, errc)
 
 	for {

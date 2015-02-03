@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	namespace = "glimpse_agent"
+	namespace   = "glimpse_agent"
+	consulAgent = "consul agent"
 )
 
 var (
@@ -62,6 +63,8 @@ func init() {
 	prometheus.MustRegister(dnsDurations)
 	prometheus.MustRegister(storeDurations)
 	prometheus.MustRegister(storeCounts)
+	prometheus.MustRegister(
+		prometheus.NewProcessCollectorPIDFn(consulAgentPid, "consul"))
 }
 
 func dnsMetricsHandler(next dns.Handler) dns.HandlerFunc {
@@ -286,4 +289,16 @@ func parseConsulStats(r io.Reader) (consulStats, error) {
 	}
 
 	return stats, nil
+}
+
+func consulAgentPid() (int, error) {
+	out, err := exec.Command("pgrep", "-f", consulAgent).Output()
+	if err != nil {
+		return 0, fmt.Errorf("could not get pid of %s: %s", consulAgent, err)
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	if err != nil {
+		return 0, fmt.Errorf("could not parse pid of %s: %s", consulAgent, err)
+	}
+	return pid, nil
 }
