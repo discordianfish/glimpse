@@ -34,7 +34,7 @@ unit-test: $(GODEP)
 	$(GODEP) go test
 
 acceptance-test: $(GODEP) $(AGENT_BIN) $(CONSUL_BIN)
-	$(GODEP) go test -tags acceptance
+	$(GODEP) go test -tags acceptance -run TestAgent
 
 release: $(AGENT_TAR)
 	curl -X POST --data-binary @$< $(AGENT_DST)/$<

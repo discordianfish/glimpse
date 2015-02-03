@@ -4,8 +4,13 @@ import (
 	"log"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/miekg/dns"
+)
+
+const (
+	defaultTTL = 5 * time.Second
 )
 
 func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
@@ -45,56 +50,47 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 		// service address.
 		addr = strings.TrimSuffix(q.Name, "."+domain)
 
-		srv, err = infoFromAddr(addr)
-		if err != nil {
-			log.Printf("[warning] dns - address parsing failed '%s': %s", q.Name, err)
-			res.SetRcode(req, dns.RcodeNameError)
-			goto respond
-		}
-
-		instances, err = store.getInstances(srv)
-		if err != nil {
-			// TODO(ts): Maybe return NoError for registered service without
-			//           instances.
-			if isNoInstances(err) {
+		switch q.Qtype {
+		case dns.TypeA, dns.TypeSRV:
+			srv, err = infoFromAddr(addr)
+			if err != nil {
+				log.Printf("[warning] dns - address parsing failed '%s': %s", q.Name, err)
 				res.SetRcode(req, dns.RcodeNameError)
 				goto respond
 			}
 
-			log.Printf("[error] store - lookup failed '%s': %s", q.Name, err)
-			res.SetRcode(req, dns.RcodeServerFailure)
-			goto respond
-		}
+			instances, err = store.getInstances(srv)
+			if err != nil {
+				// TODO(ts): Maybe return NoError for registered service without
+				//           instances.
+				if isNoInstances(err) {
+					res.SetRcode(req, dns.RcodeNameError)
+					goto respond
+				}
 
-		switch q.Qtype {
-		case dns.TypeA:
-			for _, ins := range instances {
-				rr := &dns.A{
-					Hdr: dns.RR_Header{
-						Name:   q.Name,
-						Rrtype: dns.TypeA,
-						Class:  dns.ClassINET,
-						Ttl:    5,
-					},
-					A: ins.ip,
-				}
-				res.Answer = append(res.Answer, rr)
+				log.Printf("[error] store - lookup failed '%s': %s", q.Name, err)
+				res.SetRcode(req, dns.RcodeServerFailure)
+				goto respond
 			}
-		case dns.TypeSRV:
-			for _, ins := range instances {
-				rr := &dns.SRV{
-					Hdr: dns.RR_Header{
-						Name:   q.Name,
-						Rrtype: dns.TypeSRV,
-						Class:  dns.ClassINET,
-						Ttl:    5,
-					},
-					Priority: 0,
-					Weight:   0,
-					Port:     ins.port,
-					Target:   dns.Fqdn(ins.host),
-				}
-				res.Answer = append(res.Answer, rr)
+
+			for _, i := range instances {
+				res.Answer = append(res.Answer, newRR(q, i))
+			}
+		case dns.TypeNS:
+			if err := validateZone(addr); err != nil {
+				res.SetRcode(req, dns.RcodeNameError)
+				goto respond
+			}
+
+			instances, err = store.getServers(addr)
+			if err != nil {
+				log.Printf("[error] store - lookup failed '%s': %s", q.Name, err)
+				res.SetRcode(req, dns.RcodeServerFailure)
+				goto respond
+			}
+
+			for _, i := range instances {
+				res.Answer = append(res.Answer, newRR(q, i))
 			}
 		default:
 			res.SetRcode(req, dns.RcodeNotImplemented)
@@ -118,6 +114,38 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 		//            environemnts.
 		log.Printf("[info] dns - request: %s response: %s (%d rrs)",
 			reqInfo, dns.RcodeToString[res.Rcode], len(res.Answer))
+	}
+}
+
+func newRR(q dns.Question, i instance) dns.RR {
+	hdr := dns.RR_Header{
+		Name:   q.Name,
+		Rrtype: q.Qtype,
+		Class:  dns.ClassINET,
+		Ttl:    uint32(defaultTTL.Seconds()),
+	}
+
+	switch q.Qtype {
+	case dns.TypeA:
+		return &dns.A{
+			Hdr: hdr,
+			A:   i.ip,
+		}
+	case dns.TypeSRV:
+		return &dns.SRV{
+			Hdr:      hdr,
+			Priority: 0,
+			Weight:   0,
+			Port:     i.port,
+			Target:   dns.Fqdn(i.host),
+		}
+	case dns.TypeNS:
+		return &dns.NS{
+			Hdr: hdr,
+			Ns:  dns.Fqdn(i.host),
+		}
+	default:
+		panic("unreachable")
 	}
 }
 

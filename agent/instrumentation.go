@@ -46,7 +46,7 @@ var (
 			Name:      "request_duration_microseconds",
 			Help:      "Consul API request latencies in microseconds.",
 		},
-		storeLabels,
+		[]string{"operation"},
 	)
 	storeCounts = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -175,13 +175,14 @@ func newMetricsStore(next store) *metricsStore {
 
 func (s *metricsStore) getInstances(i info) (instances, error) {
 	var (
+		op     = "getInstances"
 		labels = prometheus.Labels{
 			"service":   i.service,
 			"job":       i.job,
 			"env":       i.env,
 			"product":   i.product,
 			"zone":      i.zone,
-			"operation": "getInstances",
+			"operation": op,
 			"error":     "none",
 		}
 		start = time.Now()
@@ -198,10 +199,23 @@ func (s *metricsStore) getInstances(i info) (instances, error) {
 	}
 
 	duration := float64(time.Since(start)) / float64(time.Microsecond)
-	storeDurations.With(labels).Observe(duration)
+	storeDurations.WithLabelValues(op).Observe(duration)
 	storeCounts.With(labels).Set(float64(len(ins)))
 
 	return ins, err
+}
+
+func (s *metricsStore) getServers(zone string) (instances, error) {
+	var (
+		op    = "getServers"
+		start = time.Now()
+	)
+
+	r, err := s.next.getServers(zone)
+	duration := float64(time.Since(start)) / float64(time.Microsecond)
+	storeDurations.WithLabelValues(op).Observe(duration)
+
+	return r, err
 }
 
 func getConsulStats(bin string) (consulStats, error) {

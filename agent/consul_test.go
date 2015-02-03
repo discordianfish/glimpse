@@ -136,3 +136,40 @@ func TestConsulGetInstancesNoConsul(t *testing.T) {
 }
 
 // TODO(alx): Test services with non-matching env/service, hence filtering in getInstances.
+
+func TestConsulGetServers(t *testing.T) {
+	result := []*api.AgentMember{
+		&api.AgentMember{Name: "foo.aa"},
+		&api.AgentMember{Name: "bar.aa"},
+		&api.AgentMember{Name: "baz.bb"},
+		&api.AgentMember{Name: "qux.bc"},
+	}
+
+	client, server := setupStubConsul(result, t)
+	defer server.Close()
+
+	store := newConsulStore(client)
+
+	for _, test := range []struct {
+		zone string
+		want []string
+	}{
+		{zone: "aa", want: []string{"foo", "bar"}},
+		{zone: "bb", want: []string{"baz"}},
+		{zone: "bc", want: []string{"qux"}},
+		{zone: "dd", want: []string{}},
+	} {
+		s, err := store.getServers(test.zone)
+		if err != nil {
+			t.Fatalf("getServers failed: %s", err)
+		}
+		if want, got := len(test.want), len(s); want != got {
+			t.Errorf("want %d servers, got %d", want, got)
+		}
+		for i, w := range test.want {
+			if want, got := w, s[i].host; want != got {
+				t.Errorf("want host %s, got %s", want, got)
+			}
+		}
+	}
+}

@@ -21,9 +21,14 @@ func (s *brokenStore) getInstances(srv info) (instances, error) {
 	return nil, newError(errConsulAPI, "could not get instances")
 }
 
+func (s *brokenStore) getServers(zone string) (instances, error) {
+	return nil, newError(errConsulAPI, "could not get servers")
+}
+
 // testStore implements the glimpse.store interface.
 type testStore struct {
 	instances map[info]instances
+	servers   map[string]instances
 }
 
 func (s *testStore) getInstances(srv info) (instances, error) {
@@ -32,6 +37,10 @@ func (s *testStore) getInstances(srv info) (instances, error) {
 		return nil, newError(errNoInstances, "")
 	}
 	return r, nil
+}
+
+func (s *testStore) getServers(zone string) (instances, error) {
+	return s.servers[zone], nil
 }
 
 // testWriter implements the dns.ResponseWriter interface.
@@ -96,7 +105,7 @@ func generateInstancesFromInfo(i info) instances {
 	)
 
 	for j := 0; j < n; j++ {
-		ins[j] = &instance{
+		ins[j] = instance{
 			host: "suppenkasper",
 			ip:   net.ParseIP("1.2.3.4"),
 			port: uint16(20000 + j),

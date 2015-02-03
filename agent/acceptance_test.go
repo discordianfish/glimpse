@@ -57,7 +57,7 @@ var (
 	}
 )
 
-func TestAll(t *testing.T) {
+func TestAgent(t *testing.T) {
 	consul, err := runConsul()
 	if err != nil {
 		t.Fatalf("consul failed: %s", err)
@@ -85,8 +85,7 @@ func TestAll(t *testing.T) {
 	}()
 
 	var (
-		q   string
-		hdr *dns.RR_Header
+		q string
 	)
 
 	// success - SRV
@@ -106,9 +105,7 @@ func TestAll(t *testing.T) {
 		t.Fatalf("want %d DNS result, got %d", want, got)
 	}
 
-	hdr = res.Answer[0].Header()
-
-	if want, got := q, hdr.Name; want != got {
+	if want, got := q, res.Answer[0].Header().Name; want != got {
 		t.Fatalf("want '%s', got '%s'", want, got)
 	}
 
@@ -117,7 +114,7 @@ func TestAll(t *testing.T) {
 		t.Fatalf("failed to extract SRV type")
 	}
 
-	if want, got := fmt.Sprintf("%s.", nodeName), srv.Target; want != got {
+	if want, got := dns.Fqdn(nodeName), srv.Target; want != got {
 		t.Fatalf("want target %s, got %s", want, got)
 	}
 
@@ -142,9 +139,7 @@ func TestAll(t *testing.T) {
 		t.Fatalf("want %d DNS result, got %d", want, got)
 	}
 
-	hdr = res.Answer[0].Header()
-
-	if want, got := q, hdr.Name; want != got {
+	if want, got := q, res.Answer[0].Header().Name; want != got {
 		t.Fatalf("want '%s', got '%s'", want, got)
 	}
 
@@ -155,6 +150,36 @@ func TestAll(t *testing.T) {
 
 	if want, got := advertise, a.A.String(); want != got {
 		t.Fatalf("want A %s, got %s", want, got)
+	}
+
+	// success - NS
+	q = dns.Fqdn(fmt.Sprintf("%s.%s", srvZone, dnsZone))
+
+	res, err = query(q, dns.TypeNS, "udp")
+	if err != nil {
+		t.Fatalf("DNS lookup failed: %s", err)
+	}
+
+	want, got = dns.RcodeToString[dns.RcodeSuccess], dns.RcodeToString[res.Rcode]
+	if want != got {
+		t.Fatalf("want rcode '%s', got '%s'", want, got)
+	}
+
+	if want, got := 1, len(res.Answer); want != got {
+		t.Fatalf("want %d DNS result, got %d", want, got)
+	}
+
+	if want, got := q, res.Answer[0].Header().Name; want != got {
+		t.Fatalf("want '%s', got '%s'", want, got)
+	}
+
+	ns, ok := res.Answer[0].(*dns.NS)
+	if !ok {
+		t.Fatalf("failed to extract NS type")
+	}
+
+	if want, got := dns.Fqdn(nodeName), ns.Ns; want != got {
+		t.Fatalf("want NS %s, got %s", want, got)
 	}
 
 	// fail - non-existent DNS zone
