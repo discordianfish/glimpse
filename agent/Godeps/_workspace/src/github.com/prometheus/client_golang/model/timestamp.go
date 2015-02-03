@@ -1,4 +1,4 @@
-// Copyright 2013 Prometheus Team
+// Copyright 2013 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -14,7 +14,8 @@
 package model
 
 import (
-	"fmt"
+	"strconv"
+
 	native_time "time"
 )
 
@@ -81,7 +82,7 @@ func (t Timestamp) UnixNano() int64 {
 
 // String returns a string representation of the timestamp.
 func (t Timestamp) String() string {
-	return fmt.Sprintf("%f", float64(t)/float64(second))
+	return strconv.FormatFloat(float64(t)/float64(second), 'f', -1, 64)
 }
 
 func (t Timestamp) MarshalJSON() ([]byte, error) {

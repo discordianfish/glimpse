@@ -1,4 +1,4 @@
-// Copyright 2013 Prometheus Team
+// Copyright 2013 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -62,4 +62,18 @@ func (s Samples) Less(i, j int) bool {
 
 func (s Samples) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
+}
+
+// Equal compares two sets of samples and returns true if they are equal.
+func (s Samples) Equal(o Samples) bool {
+	if len(s) != len(o) {
+		return false
+	}
+
+	for i, sample := range s {
+		if !sample.Equal(o[i]) {
+			return false
+		}
+	}
+	return true
 }

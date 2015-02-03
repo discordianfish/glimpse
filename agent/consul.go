@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/armon/consul-api"
+	"github.com/hashicorp/consul/api"
 	consul "github.com/hashicorp/consul/consul/structs"
 )
 
 type consulStore struct {
-	client *consulapi.Client
+	client *api.Client
 }
 
-func newConsulStore(client *consulapi.Client) store {
+func newConsulStore(client *api.Client) store {
 	return &consulStore{
 		client: client,
 	}
@@ -24,7 +24,7 @@ func (s *consulStore) getInstances(info info) (instances, error) {
 		jobTag      = fmt.Sprintf("glimpse:job=%s", info.job)
 		serviceTag  = fmt.Sprintf("glimpse:service=%s", info.service)
 		passingOnly = true
-		options     = &consulapi.QueryOptions{
+		options     = &api.QueryOptions{
 			AllowStale: true,
 			Datacenter: info.zone,
 		}
@@ -79,12 +79,12 @@ func (s *consulStore) getInstances(info info) (instances, error) {
 	return is, nil
 }
 
-func filterEntries(entries []*consulapi.ServiceEntry) []*consulapi.ServiceEntry {
+func filterEntries(entries []*api.ServiceEntry) []*api.ServiceEntry {
 	if len(entries) == 0 {
 		return entries
 	}
 
-	es := []*consulapi.ServiceEntry{}
+	es := []*api.ServiceEntry{}
 
 	for _, e := range entries {
 		isHealthy := true

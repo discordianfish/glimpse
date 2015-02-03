@@ -13,20 +13,17 @@ import (
 %}
 
 %union {
-	f        float64
 	num      int
 	str      string
 	obj      *hcl.Object
 	objlist  []*hcl.Object
 }
 
-%type	<f> float
 %type	<num> int
 %type	<obj> number object pair value
 %type	<objlist> array elements members
-%type	<str> exp
+%type	<str> exp frac
 
-%token  <f> FLOAT
 %token  <num> NUMBER
 %token  <str> COLON COMMA IDENTIFIER EQUAL NEWLINE STRING
 %token  <str> LEFTBRACE RIGHTBRACE LEFTBRACKET RIGHTBRACKET
@@ -143,11 +140,17 @@ number:
 			Value: $1,
 		}
 	}
-|	float
+|	int frac
 	{
+		fs := fmt.Sprintf("%d.%s", $1, $2)
+		f, err := strconv.ParseFloat(fs, 64)
+		if err != nil {
+			panic(err)
+		}
+
 		$$ = &hcl.Object{
 			Type:  hcl.ValueTypeFloat,
-			Value: $1,
+			Value: f,
 		}
 	}
 |   int exp
@@ -163,9 +166,9 @@ number:
 			Value: f,
 		}
     }
-|   float exp
+|   int frac exp
     {
-		fs := fmt.Sprintf("%f%s", $1, $2)
+		fs := fmt.Sprintf("%d.%s%s", $1, $2, $3)
 		f, err := strconv.ParseFloat(fs, 64)
 		if err != nil {
 			panic(err)
@@ -187,16 +190,6 @@ int:
 		$$ = $1
 	}
 
-float:
-	 MINUS float
-	{
-		$$ = $2 * -1
-	}
-|	FLOAT
-	{
-		$$ = $1
-	}
-
 exp:
     EPLUS NUMBER
     {
@@ -206,5 +199,11 @@ exp:
     {
         $$ = "e-" + strconv.FormatInt(int64($2), 10)
     }
+
+frac:
+	PERIOD NUMBER
+	{
+		$$ = strconv.FormatInt(int64($2), 10)
+	}
 
 %%

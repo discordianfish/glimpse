@@ -455,19 +455,12 @@ PrivateKey: WURgWHCcYIYUPWgeLmiPY2DJJk02vgrmTfitxgqcL4vwW7BOrbawVmVe0d9V94SR`
 	sig.SignerName = eckey.(*DNSKEY).Hdr.Name
 	sig.Algorithm = eckey.(*DNSKEY).Algorithm
 
-	if sig.Sign(privkey, []RR{a}) != nil {
-		t.Fatal("failure to sign the record")
-	}
+	sig.Sign(privkey, []RR{a})
 
+	t.Logf("%s", sig.String())
 	if e := sig.Verify(eckey.(*DNSKEY), []RR{a}); e != nil {
-		t.Logf("\n%s\n%s\n%s\n\n%s\n\n",
-			eckey.(*DNSKEY).String(),
-			a.String(),
-			sig.String(),
-			eckey.(*DNSKEY).PrivateKeyString(privkey),
-		)
-
-		t.Fatalf("failure to validate: %s", e.Error())
+		t.Logf("failure to validate: %s", e.Error())
+		t.Fail()
 	}
 }
 
@@ -510,13 +503,6 @@ func TestSignVerifyECDSA2(t *testing.T) {
 
 	err = sig.Verify(key, []RR{srv})
 	if err != nil {
-		t.Logf("\n%s\n%s\n%s\n\n%s\n\n",
-			key.String(),
-			srv.String(),
-			sig.String(),
-			key.PrivateKeyString(privkey),
-		)
-
 		t.Fatal("Failure to validate:", err)
 	}
 }

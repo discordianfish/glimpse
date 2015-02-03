@@ -1,4 +1,4 @@
-// Copyright 2014 Prometheus Team
+// Copyright 2014 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -74,7 +74,7 @@ func ExampleGaugeVec() {
 }
 
 func ExampleGaugeFunc() {
-	if _, err := prometheus.Register(prometheus.NewGaugeFunc(
+	if err := prometheus.Register(prometheus.NewGaugeFunc(
 		prometheus.GaugeOpts{
 			Subsystem: "runtime",
 			Name:      "goroutines_count",
@@ -95,7 +95,7 @@ func ExampleCounter() {
 	pushCounter := prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "repository_pushes", // Note: No help string...
 	})
-	_, err := prometheus.Register(pushCounter) // ... so this will return an error.
+	err := prometheus.Register(pushCounter) // ... so this will return an error.
 	if err != nil {
 		fmt.Println("Push counter couldn't be registered, no counting will happen:", err)
 		return
@@ -106,7 +106,7 @@ func ExampleCounter() {
 		Name: "repository_pushes",
 		Help: "Number of pushes to external repository.",
 	})
-	_, err = prometheus.Register(pushCounter)
+	err = prometheus.Register(pushCounter)
 	if err != nil {
 		fmt.Println("Push counter couldn't be registered AGAIN, no counting will happen:", err)
 		return
@@ -194,7 +194,7 @@ func ExampleRegister() {
 		Help:      "Total number of tasks completed.",
 	})
 	// This will register fine.
-	if _, err := prometheus.Register(taskCounter); err != nil {
+	if err := prometheus.Register(taskCounter); err != nil {
 		fmt.Println(err)
 	} else {
 		fmt.Println("taskCounter registered.")
@@ -219,7 +219,7 @@ func ExampleRegister() {
 	)
 
 	// Registering will fail because we already have a metric of that name.
-	if _, err := prometheus.Register(taskCounterVec); err != nil {
+	if err := prometheus.Register(taskCounterVec); err != nil {
 		fmt.Println("taskCounterVec not registered:", err)
 	} else {
 		fmt.Println("taskCounterVec registered.")
@@ -231,7 +231,7 @@ func ExampleRegister() {
 	}
 
 	// Try registering taskCounterVec again.
-	if _, err := prometheus.Register(taskCounterVec); err != nil {
+	if err := prometheus.Register(taskCounterVec); err != nil {
 		fmt.Println("taskCounterVec not registered:", err)
 	} else {
 		fmt.Println("taskCounterVec registered.")
@@ -253,7 +253,7 @@ func ExampleRegister() {
 		},
 		[]string{"worker_id"},
 	)
-	if _, err := prometheus.Register(taskCounterVec); err != nil {
+	if err := prometheus.Register(taskCounterVec); err != nil {
 		fmt.Println("taskCounterVec not registered:", err)
 	} else {
 		fmt.Println("taskCounterVec registered.")
@@ -299,7 +299,7 @@ func ExampleRegister() {
 		ConstLabels: prometheus.Labels{"worker_id": "42"},
 	}
 	taskCounterForWorker42 := prometheus.NewCounter(counterOpts)
-	if _, err := prometheus.Register(taskCounterForWorker42); err != nil {
+	if err := prometheus.Register(taskCounterForWorker42); err != nil {
 		fmt.Println("taskCounterVForWorker42 not registered:", err)
 	} else {
 		fmt.Println("taskCounterForWorker42 registered.")
@@ -313,7 +313,7 @@ func ExampleRegister() {
 	// counterOpts. Just change the ConstLabels.
 	counterOpts.ConstLabels = prometheus.Labels{"worker_id": "2001"}
 	taskCounterForWorker2001 := prometheus.NewCounter(counterOpts)
-	if _, err := prometheus.Register(taskCounterForWorker2001); err != nil {
+	if err := prometheus.Register(taskCounterForWorker2001); err != nil {
 		fmt.Println("taskCounterVForWorker2001 not registered:", err)
 	} else {
 		fmt.Println("taskCounterForWorker2001 registered.")
@@ -362,11 +362,11 @@ func ExampleSummary() {
 	//   sample_sum: 29969.50000000001
 	//   quantile: <
 	//     quantile: 0.5
-	//     value: 30.2
+	//     value: 31.1
 	//   >
 	//   quantile: <
 	//     quantile: 0.9
-	//     value: 41.4
+	//     value: 41.3
 	//   >
 	//   quantile: <
 	//     quantile: 0.99
@@ -419,11 +419,11 @@ func ExampleSummaryVec() {
 	//   sample_sum: 31956.100000000017
 	//   quantile: <
 	//     quantile: 0.5
-	//     value: 32
+	//     value: 32.4
 	//   >
 	//   quantile: <
 	//     quantile: 0.9
-	//     value: 41.5
+	//     value: 41.4
 	//   >
 	//   quantile: <
 	//     quantile: 0.99
@@ -439,11 +439,11 @@ func ExampleSummaryVec() {
 	//   sample_sum: 29969.50000000001
 	//   quantile: <
 	//     quantile: 0.5
-	//     value: 30.2
+	//     value: 31.1
 	//   >
 	//   quantile: <
 	//     quantile: 0.9
-	//     value: 41.4
+	//     value: 41.3
 	//   >
 	//   quantile: <
 	//     quantile: 0.99

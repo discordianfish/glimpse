@@ -1,4 +1,4 @@
-// Copyright 2013 Prometheus Team
+// Copyright 2013 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -15,6 +15,7 @@ package model
 
 import (
 	"fmt"
+	"strconv"
 )
 
 // A SampleValue is a representation of a value for a given sample at a given
@@ -28,9 +29,9 @@ func (v SampleValue) Equal(o SampleValue) bool {
 
 // MarshalJSON implements json.Marshaler.
 func (v SampleValue) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf(`"%f"`, v)), nil
+	return []byte(fmt.Sprintf(`"%s"`, v)), nil
 }
 
 func (v SampleValue) String() string {
-	return fmt.Sprint(float64(v))
+	return strconv.FormatFloat(float64(v), 'f', -1, 64)
 }

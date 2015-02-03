@@ -1,4 +1,4 @@
-// Copyright 2013 Prometheus Team
+// Copyright 2013 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -55,7 +55,7 @@ func TestTimestampConversions(t *testing.T) {
 
 	ts := TimestampFromUnixNano(unixNano)
 	if !ts.Time().Equal(t1) {
-		t.Fatalf("Expected %s, got %s %d", t1, ts.Time())
+		t.Fatalf("Expected %s, got %s", t1, ts.Time())
 	}
 
 	// Test available precision.

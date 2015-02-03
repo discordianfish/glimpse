@@ -5,13 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/armon/consul-api"
+	"github.com/hashicorp/consul/api"
 	consul "github.com/hashicorp/consul/consul/structs"
 )
 
 type test struct {
 	want  int
-	input []*consulapi.CatalogService
+	input []*api.CatalogService
 }
 
 func TestConsulGetInstances(t *testing.T) {
@@ -19,7 +19,7 @@ func TestConsulGetInstances(t *testing.T) {
 	if err != nil {
 		t.Fatalf("info extraction failed: %s", err)
 	}
-	result := []*consulapi.ServiceEntry{
+	result := []*api.ServiceEntry{
 		createServiceEntry(i, 8080, "host00.gg.local", "10.2.3.4", nil),
 	}
 
@@ -38,7 +38,7 @@ func TestConsulGetInstances(t *testing.T) {
 }
 
 func TestConsulGetInstancesEmptyResult(t *testing.T) {
-	client, server := setupStubConsul([]*consulapi.CatalogService{}, t)
+	client, server := setupStubConsul([]*api.CatalogService{}, t)
 	defer server.Close()
 
 	store := newConsulStore(client)
@@ -64,11 +64,11 @@ func TestConsulGetInstancesFailingCheck(t *testing.T) {
 	var (
 		host   = "host02.gg.local"
 		ip     = "10.3.4.5"
-		result = []*consulapi.ServiceEntry{
+		result = []*api.ServiceEntry{
 			createServiceEntry(i, 9090, host, ip, nil),
 			createServiceEntry(i, 9091, host, ip, nil),
-			createServiceEntry(i, 9092, host, ip, []*consulapi.HealthCheck{
-				&consulapi.HealthCheck{
+			createServiceEntry(i, 9092, host, ip, []*api.HealthCheck{
+				&api.HealthCheck{
 					Status: consul.HealthCritical,
 				},
 			}),
@@ -94,7 +94,7 @@ func TestConsulGetInstancesInvalidIP(t *testing.T) {
 	if err != nil {
 		t.Fatalf("info extraction failed: %s", err)
 	}
-	result := []*consulapi.ServiceEntry{
+	result := []*api.ServiceEntry{
 		createServiceEntry(i, 8081, "host01.gg.local", "3.2.1", nil),
 	}
 
@@ -110,7 +110,7 @@ func TestConsulGetInstancesInvalidIP(t *testing.T) {
 }
 
 func TestConsulGetInstancesNoConsul(t *testing.T) {
-	client, err := consulapi.NewClient(&consulapi.Config{
+	client, err := api.NewClient(&api.Config{
 		Address:    "1.2.3.4",
 		Datacenter: defaultSrvZone,
 		HttpClient: &http.Client{

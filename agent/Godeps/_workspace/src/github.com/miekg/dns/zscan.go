@@ -899,9 +899,9 @@ func appendOrigin(name, origin string) string {
 func locCheckNorth(token string, latitude uint32) (uint32, bool) {
 	switch token {
 	case "n", "N":
-		return LOC_EQUATOR + latitude, true
+		return _LOC_EQUATOR + latitude, true
 	case "s", "S":
-		return LOC_EQUATOR - latitude, true
+		return _LOC_EQUATOR - latitude, true
 	}
 	return latitude, false
 }
@@ -910,9 +910,9 @@ func locCheckNorth(token string, latitude uint32) (uint32, bool) {
 func locCheckEast(token string, longitude uint32) (uint32, bool) {
 	switch token {
 	case "e", "E":
-		return LOC_EQUATOR + longitude, true
+		return _LOC_EQUATOR + longitude, true
 	case "w", "W":
-		return LOC_EQUATOR - longitude, true
+		return _LOC_EQUATOR - longitude, true
 	}
 	return longitude, false
 }

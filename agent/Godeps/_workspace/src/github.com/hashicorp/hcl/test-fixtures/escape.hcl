@@ -1,1 +1,1 @@
-foo = "bar\"baz\\n"
+foo = "bar\"baz"

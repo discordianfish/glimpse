@@ -1,4 +1,4 @@
-// Copyright 2014 Prometheus Team
+// Copyright 2014 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -33,7 +33,9 @@ type Collector interface {
 	// duplicate descriptors. Those duplicates are simply ignored. However,
 	// two different Collectors must not send duplicate descriptors.) This
 	// method idempotently sends the same descriptors throughout the
-	// lifetime of the Collector.
+	// lifetime of the Collector. If a Collector encounters an error while
+	// executing this method, it must send an invalid descriptor (created
+	// with NewInvalidDesc) to signal the error to the registry.
 	Describe(chan<- *Desc)
 	// Collect is called by Prometheus when collecting metrics. The
 	// implementation sends each collected metric via the provided channel

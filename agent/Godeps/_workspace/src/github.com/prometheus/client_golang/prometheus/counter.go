@@ -1,4 +1,4 @@
-// Copyright 2014 Prometheus Team
+// Copyright 2014 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -55,7 +55,7 @@ func NewCounter(opts CounterOpts) Counter {
 		nil,
 		opts.ConstLabels,
 	)
-	result := &counter{value: value{desc: desc, valType: CounterValue}}
+	result := &counter{value: value{desc: desc, valType: CounterValue, labelPairs: desc.constLabelPairs}}
 	result.Init(result) // Init self-collection.
 	return result
 }

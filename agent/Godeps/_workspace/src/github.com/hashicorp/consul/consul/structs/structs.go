@@ -23,6 +23,7 @@ const (
 	KVSRequestType
 	SessionRequestType
 	ACLRequestType
+	TombstoneRequestType
 )
 
 const (
@@ -136,6 +137,7 @@ type RegisterRequest struct {
 	Address    string
 	Service    *NodeService
 	Check      *HealthCheck
+	Checks     HealthChecks
 	WriteRequest
 }
 
@@ -216,12 +218,13 @@ type Services map[string][]string
 
 // ServiceNode represents a node that is part of a service
 type ServiceNode struct {
-	Node        string
-	Address     string
-	ServiceID   string
-	ServiceName string
-	ServiceTags []string
-	ServicePort int
+	Node           string
+	Address        string
+	ServiceID      string
+	ServiceName    string
+	ServiceTags    []string
+	ServiceAddress string
+	ServicePort    int
 }
 type ServiceNodes []ServiceNode
 
@@ -230,6 +233,7 @@ type NodeService struct {
 	ID      string
 	Service string
 	Tags    []string
+	Address string
 	Port    int
 }
 type NodeServices struct {
@@ -327,6 +331,7 @@ type KVSOp string
 const (
 	KVSSet        KVSOp = "set"
 	KVSDelete           = "delete"
+	KVSDeleteCAS        = "delete-cas" // Delete with check-and-set
 	KVSDeleteTree       = "delete-tree"
 	KVSCAS              = "cas"    // Check-and-set
 	KVSLock             = "lock"   // Lock a key
@@ -385,6 +390,12 @@ const (
 	SessionKeysDelete                  = "delete"
 )
 
+const (
+	SessionTTLMin        = 10 * time.Second
+	SessionTTLMax        = 3600 * time.Second
+	SessionTTLMultiplier = 2
+)
+
 // Session is used to represent an open session in the KV store.
 // This issued to associate node checks with acquired locks.
 type Session struct {
@@ -395,6 +406,7 @@ type Session struct {
 	Checks      []string
 	LockDelay   time.Duration
 	Behavior    SessionBehavior // What to do when session is invalidated
+	TTL         string
 }
 type Sessions []*Session
 
@@ -522,6 +534,24 @@ func (r *EventFireRequest) RequestDatacenter() string {
 // EventFireResponse is used to respond to a fire request.
 type EventFireResponse struct {
 	QueryMeta
+}
+
+type TombstoneOp string
+
+const (
+	TombstoneReap TombstoneOp = "reap"
+)
+
+// TombstoneRequest is used to trigger a reaping of the tombstones
+type TombstoneRequest struct {
+	Datacenter string
+	Op         TombstoneOp
+	ReapIndex  uint64
+	WriteRequest
+}
+
+func (r *TombstoneRequest) RequestDatacenter() string {
+	return r.Datacenter
 }
 
 // msgpackHandle is a shared handle for encoding/decoding of structs

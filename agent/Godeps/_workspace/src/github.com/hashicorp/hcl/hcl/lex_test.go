@@ -21,10 +21,6 @@ func TestLex(t *testing.T) {
 			[]int{lexEOF},
 		},
 		{
-			"complex_key.hcl",
-			[]int{IDENTIFIER, EQUAL, STRING, lexEOF},
-		},
-		{
 			"multiple.hcl",
 			[]int{
 				IDENTIFIER, EQUAL, STRING,
@@ -49,8 +45,6 @@ func TestLex(t *testing.T) {
 			[]int{
 				IDENTIFIER, LEFTBRACE,
 				IDENTIFIER, EQUAL, NUMBER,
-				STRING, EQUAL, NUMBER,
-				STRING, EQUAL, NUMBER,
 				RIGHTBRACE, lexEOF,
 			},
 		},

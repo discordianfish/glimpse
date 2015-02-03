@@ -1,4 +1,4 @@
-// Copyright 2014 Prometheus Team
+// Copyright 2014 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -82,7 +82,7 @@ func TestGaugeConcurrency(t *testing.T) {
 		}
 		start.Done()
 
-		if expected, got := <-result, gge.(*value).val; math.Abs(expected-got) > 0.000001 {
+		if expected, got := <-result, math.Float64frombits(gge.(*value).valBits); math.Abs(expected-got) > 0.000001 {
 			t.Fatalf("expected approx. %f, got %f", expected, got)
 			return false
 		}
@@ -146,7 +146,7 @@ func TestGaugeVecConcurrency(t *testing.T) {
 		start.Done()
 
 		for i := range sStreams {
-			if expected, got := <-results[i], gge.WithLabelValues(string('A'+i)).(*value).val; math.Abs(expected-got) > 0.000001 {
+			if expected, got := <-results[i], math.Float64frombits(gge.WithLabelValues(string('A'+i)).(*value).valBits); math.Abs(expected-got) > 0.000001 {
 				t.Fatalf("expected approx. %f, got %f", expected, got)
 				return false
 			}

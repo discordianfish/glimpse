@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/armon/consul-api"
+	"github.com/hashicorp/consul/api"
 	"github.com/miekg/dns"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -49,7 +49,7 @@ func main() {
 	}
 
 	log.Printf("[info] glimpse-agent starting. v%s", version)
-	client, err := consulapi.NewClient(&consulapi.Config{
+	client, err := api.NewClient(&api.Config{
 		Address:    *consulAddr,
 		Datacenter: *srvZone,
 	})
@@ -112,7 +112,7 @@ func registerConculCollector(consulBin string, errc chan error) {
 	c := newConsulCollector(consulBin, errc)
 
 	for {
-		if _, err := prometheus.Register(c); err != nil {
+		if err := prometheus.Register(c); err != nil {
 			log.Printf("[error] prometheus - could not register collector"+
 				" (-consul.bin=%s)", consulBin)
 			<-time.After(1 * time.Second)

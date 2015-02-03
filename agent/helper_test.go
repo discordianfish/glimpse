@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/hashicorp/consul/api"
+	"github.com/miekg/dns"
 	"math/rand"
 	"net"
 	"net/http"
@@ -10,9 +12,6 @@ import (
 	"net/url"
 	"reflect"
 	"testing"
-
-	"github.com/armon/consul-api"
-	"github.com/miekg/dns"
 )
 
 // brokenStore implements the glimpse.store interface.
@@ -66,14 +65,14 @@ func createServiceEntry(
 	i info,
 	port int,
 	host, ip string,
-	checks []*consulapi.HealthCheck,
-) *consulapi.ServiceEntry {
-	return &consulapi.ServiceEntry{
-		Node: &consulapi.Node{
+	checks []*api.HealthCheck,
+) *api.ServiceEntry {
+	return &api.ServiceEntry{
+		Node: &api.Node{
 			Node:    host,
 			Address: ip,
 		},
-		Service: &consulapi.AgentService{
+		Service: &api.AgentService{
 			ID:      fmt.Sprintf("%s-%s-%d", i.product, i.job, port),
 			Service: i.product,
 			Tags:    infoToTags(i),
@@ -119,7 +118,7 @@ func generateInstancesFromInfo(i info) instances {
 func setupStubConsul(
 	result interface{},
 	t *testing.T,
-) (*consulapi.Client, *httptest.Server) {
+) (*api.Client, *httptest.Server) {
 	server := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -136,7 +135,7 @@ func setupStubConsul(
 		t.Fatalf("server url parse failed: %s", err)
 	}
 
-	client, err := consulapi.NewClient(&consulapi.Config{
+	client, err := api.NewClient(&api.Config{
 		Address:    url.Host,
 		Datacenter: defaultSrvZone,
 	})

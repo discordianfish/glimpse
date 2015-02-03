@@ -1,4 +1,4 @@
-// Copyright 2014 Prometheus Team
+// Copyright 2014 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,8 +16,9 @@ package prometheus
 import (
 	"errors"
 	"fmt"
+	"math"
 	"sort"
-	"sync"
+	"sync/atomic"
 
 	dto "github.com/prometheus/client_model/go"
 
@@ -44,10 +45,9 @@ var errInconsistentCardinality = errors.New("inconsistent label cardinality")
 type value struct {
 	SelfCollector
 
-	mtx        sync.RWMutex
 	desc       *Desc
 	valType    ValueType
-	val        float64
+	valBits    uint64 // These are the bits of the represented float64 value.
 	labelPairs []*dto.LabelPair
 }
 
@@ -61,7 +61,7 @@ func newValue(desc *Desc, valueType ValueType, val float64, labelValues ...strin
 	result := &value{
 		desc:       desc,
 		valType:    valueType,
-		val:        val,
+		valBits:    math.Float64bits(val),
 		labelPairs: makeLabelPairs(desc, labelValues),
 	}
 	result.Init(result)
@@ -73,10 +73,7 @@ func (v *value) Desc() *Desc {
 }
 
 func (v *value) Set(val float64) {
-	v.mtx.Lock()
-	defer v.mtx.Unlock()
-
-	v.val = val
+	atomic.StoreUint64(&v.valBits, math.Float64bits(val))
 }
 
 func (v *value) Inc() {
@@ -88,22 +85,22 @@ func (v *value) Dec() {
 }
 
 func (v *value) Add(val float64) {
-	v.mtx.Lock()
-	defer v.mtx.Unlock()
-
-	v.val += val
+	for {
+		oldBits := atomic.LoadUint64(&v.valBits)
+		newBits := math.Float64bits(math.Float64frombits(oldBits) + val)
+		if atomic.CompareAndSwapUint64(&v.valBits, oldBits, newBits) {
+			return
+		}
+	}
 }
 
 func (v *value) Sub(val float64) {
 	v.Add(val * -1)
 }
 
-func (v *value) Write(out *dto.Metric) {
-	v.mtx.RLock()
-	val := v.val
-	v.mtx.RUnlock()
-
-	populateMetric(v.valType, val, v.labelPairs, out)
+func (v *value) Write(out *dto.Metric) error {
+	val := math.Float64frombits(atomic.LoadUint64(&v.valBits))
+	return populateMetric(v.valType, val, v.labelPairs, out)
 }
 
 // valueFunc is a generic metric for simple values retrieved on collect time
@@ -141,8 +138,8 @@ func (v *valueFunc) Desc() *Desc {
 	return v.desc
 }
 
-func (v *valueFunc) Write(out *dto.Metric) {
-	populateMetric(v.valType, v.function(), v.labelPairs, out)
+func (v *valueFunc) Write(out *dto.Metric) error {
+	return populateMetric(v.valType, v.function(), v.labelPairs, out)
 }
 
 // NewConstMetric returns a metric with one fixed value that cannot be
@@ -184,8 +181,8 @@ func (m *constMetric) Desc() *Desc {
 	return m.desc
 }
 
-func (m *constMetric) Write(out *dto.Metric) {
-	populateMetric(m.valType, m.val, m.labelPairs, out)
+func (m *constMetric) Write(out *dto.Metric) error {
+	return populateMetric(m.valType, m.val, m.labelPairs, out)
 }
 
 func populateMetric(
@@ -193,7 +190,7 @@ func populateMetric(
 	v float64,
 	labelPairs []*dto.LabelPair,
 	m *dto.Metric,
-) {
+) error {
 	m.Label = labelPairs
 	switch t {
 	case CounterValue:
@@ -203,8 +200,9 @@ func populateMetric(
 	case UntypedValue:
 		m.Untyped = &dto.Untyped{Value: proto.Float64(v)}
 	default:
-		panic(fmt.Errorf("encountered unknown type %v", t))
+		return fmt.Errorf("encountered unknown type %v", t)
 	}
+	return nil
 }
 
 func makeLabelPairs(desc *Desc, labelValues []string) []*dto.LabelPair {

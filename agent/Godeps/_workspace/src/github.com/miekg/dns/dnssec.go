@@ -97,10 +97,6 @@ type dnskeyWireFmt struct {
 	/* Nothing is left out */
 }
 
-func divRoundUp(a, b int) int {
-	return (a + b - 1) / b
-}
-
 // KeyTag calculates the keytag (or key-id) of the DNSKEY.
 func (k *DNSKEY) KeyTag() uint16 {
 	if k == nil {
@@ -112,7 +108,7 @@ func (k *DNSKEY) KeyTag() uint16 {
 		// Look at the bottom two bytes of the modules, which the last
 		// item in the pubkey. We could do this faster by looking directly
 		// at the base64 values. But I'm lazy.
-		modulus, _ := fromBase64([]byte(k.PublicKey))
+		modulus, _ := packBase64([]byte(k.PublicKey))
 		if len(modulus) > 1 {
 			x, _ := unpackUint16(modulus, len(modulus)-2)
 			keytag = int(x)
@@ -259,7 +255,6 @@ func (rr *RRSIG) Sign(k PrivateKey, rrset []RR) error {
 	var sighash []byte
 	var h hash.Hash
 	var ch crypto.Hash // Only need for RSA
-	var intlen int
 	switch rr.Algorithm {
 	case DSA, DSANSEC3SHA1:
 		// Implicit in the ParameterSizes
@@ -269,10 +264,8 @@ func (rr *RRSIG) Sign(k PrivateKey, rrset []RR) error {
 	case RSASHA256, ECDSAP256SHA256:
 		h = sha256.New()
 		ch = crypto.SHA256
-		intlen = 32
 	case ECDSAP384SHA384:
 		h = sha512.New384()
-		intlen = 48
 	case RSASHA512:
 		h = sha512.New()
 		ch = crypto.SHA512
@@ -291,24 +284,24 @@ func (rr *RRSIG) Sign(k PrivateKey, rrset []RR) error {
 			return err
 		}
 		signature := []byte{0x4D} // T value, here the ASCII M for Miek (not used in DNSSEC)
-		signature = append(signature, intToBytes(r1, 20)...)
-		signature = append(signature, intToBytes(s1, 20)...)
-		rr.Signature = toBase64(signature)
+		signature = append(signature, r1.Bytes()...)
+		signature = append(signature, s1.Bytes()...)
+		rr.Signature = unpackBase64(signature)
 	case *rsa.PrivateKey:
 		// We can use nil as rand.Reader here (says AGL)
 		signature, err := rsa.SignPKCS1v15(nil, p, ch, sighash)
 		if err != nil {
 			return err
 		}
-		rr.Signature = toBase64(signature)
+		rr.Signature = unpackBase64(signature)
 	case *ecdsa.PrivateKey:
 		r1, s1, err := ecdsa.Sign(rand.Reader, p, sighash)
 		if err != nil {
 			return err
 		}
-		signature := intToBytes(r1, intlen)
-		signature = append(signature, intToBytes(s1, intlen)...)
-		rr.Signature = toBase64(signature)
+		signature := r1.Bytes()
+		signature = append(signature, s1.Bytes()...)
+		rr.Signature = unpackBase64(signature)
 	default:
 		// Not given the correct key
 		return ErrKeyAlg
@@ -451,7 +444,7 @@ func (rr *RRSIG) ValidityPeriod(t time.Time) bool {
 
 // Return the signatures base64 encodedig sigdata as a byte slice.
 func (s *RRSIG) sigBuf() []byte {
-	sigbuf, err := fromBase64([]byte(s.Signature))
+	sigbuf, err := packBase64([]byte(s.Signature))
 	if err != nil {
 		return nil
 	}
@@ -485,7 +478,7 @@ func (k *DNSKEY) setPublicKeyInPrivate(p PrivateKey) bool {
 
 // publicKeyRSA returns the RSA public key from a DNSKEY record.
 func (k *DNSKEY) publicKeyRSA() *rsa.PublicKey {
-	keybuf, err := fromBase64([]byte(k.PublicKey))
+	keybuf, err := packBase64([]byte(k.PublicKey))
 	if err != nil {
 		return nil
 	}
@@ -523,7 +516,7 @@ func (k *DNSKEY) publicKeyRSA() *rsa.PublicKey {
 
 // publicKeyCurve returns the Curve public key from the DNSKEY record.
 func (k *DNSKEY) publicKeyCurve() *ecdsa.PublicKey {
-	keybuf, err := fromBase64([]byte(k.PublicKey))
+	keybuf, err := packBase64([]byte(k.PublicKey))
 	if err != nil {
 		return nil
 	}
@@ -550,7 +543,7 @@ func (k *DNSKEY) publicKeyCurve() *ecdsa.PublicKey {
 }
 
 func (k *DNSKEY) publicKeyDSA() *dsa.PublicKey {
-	keybuf, err := fromBase64([]byte(k.PublicKey))
+	keybuf, err := packBase64([]byte(k.PublicKey))
 	if err != nil {
 		return nil
 	}
@@ -580,7 +573,7 @@ func (k *DNSKEY) setPublicKeyRSA(_E int, _N *big.Int) bool {
 	}
 	buf := exponentToBuf(_E)
 	buf = append(buf, _N.Bytes()...)
-	k.PublicKey = toBase64(buf)
+	k.PublicKey = unpackBase64(buf)
 	return true
 }
 
@@ -589,14 +582,9 @@ func (k *DNSKEY) setPublicKeyCurve(_X, _Y *big.Int) bool {
 	if _X == nil || _Y == nil {
 		return false
 	}
-	var intlen int
-	switch k.Algorithm {
-	case ECDSAP256SHA256:
-		intlen = 32
-	case ECDSAP384SHA384:
-		intlen = 48
-	}
-	k.PublicKey = toBase64(curveToBuf(_X, _Y, intlen))
+	buf := curveToBuf(_X, _Y)
+	// Check the length of the buffer, either 64 or 92 bytes
+	k.PublicKey = unpackBase64(buf)
 	return true
 }
 
@@ -606,7 +594,7 @@ func (k *DNSKEY) setPublicKeyDSA(_Q, _P, _G, _Y *big.Int) bool {
 		return false
 	}
 	buf := dsaToBuf(_Q, _P, _G, _Y)
-	k.PublicKey = toBase64(buf)
+	k.PublicKey = unpackBase64(buf)
 	return true
 }
 
@@ -630,21 +618,21 @@ func exponentToBuf(_E int) []byte {
 
 // Set the public key for X and Y for Curve. The two
 // values are just concatenated.
-func curveToBuf(_X, _Y *big.Int, intlen int) []byte {
-	buf := intToBytes(_X, intlen)
-	buf = append(buf, intToBytes(_Y, intlen)...)
+func curveToBuf(_X, _Y *big.Int) []byte {
+	buf := _X.Bytes()
+	buf = append(buf, _Y.Bytes()...)
 	return buf
 }
 
 // Set the public key for X and Y for Curve. The two
 // values are just concatenated.
 func dsaToBuf(_Q, _P, _G, _Y *big.Int) []byte {
-	t := divRoundUp(divRoundUp(_G.BitLen(), 8)-64, 8)
-	buf := []byte{byte(t)}
-	buf = append(buf, intToBytes(_Q, 20)...)
-	buf = append(buf, intToBytes(_P, 64+t*8)...)
-	buf = append(buf, intToBytes(_G, 64+t*8)...)
-	buf = append(buf, intToBytes(_Y, 64+t*8)...)
+	t := byte((len(_G.Bytes()) - 64) / 8)
+	buf := []byte{t}
+	buf = append(buf, _Q.Bytes()...)
+	buf = append(buf, _P.Bytes()...)
+	buf = append(buf, _G.Bytes()...)
+	buf = append(buf, _Y.Bytes()...)
 	return buf
 }
 
