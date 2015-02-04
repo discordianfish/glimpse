@@ -27,12 +27,12 @@ var (
 
 type store interface {
 	getInstances(info) (instances, error)
+	getServers(string) (instances, error)
 }
 
-type instances []*instance
+type instances []instance
 
 type instance struct {
-	info info
 	host string
 	ip   net.IP
 	port uint16
@@ -52,6 +52,13 @@ type info struct {
 	zone     string
 }
 
+func validateZone(zone string) error {
+	if !rZone.MatchString(zone) {
+		return fmt.Errorf("zone %q is invalid", zone)
+	}
+	return nil
+}
+
 func infoFromAddr(addr string) (info, error) {
 	fields := strings.SplitN(addr, ".", 5)
 
@@ -67,8 +74,8 @@ func infoFromAddr(addr string) (info, error) {
 		service = fields[0]
 	)
 
-	if len(zone) > 1 && !rZone.MatchString(zone) {
-		return info{}, fmt.Errorf("zone %q is invalid", zone)
+	if err := validateZone(zone); err != nil {
+		return info{}, err
 	}
 	if !rField.MatchString(product) {
 		return info{}, fmt.Errorf("product %q is invalid", product)

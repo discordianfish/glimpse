@@ -224,7 +224,7 @@ func TestDnsMetricsHandler(t *testing.T) {
 	}
 }
 
-func TestMetricsStore(t *testing.T) {
+func TestMetricsStoreGetInstances(t *testing.T) {
 	var (
 		i = info{
 			service: "http",
@@ -234,7 +234,7 @@ func TestMetricsStore(t *testing.T) {
 			zone:    "tt",
 		}
 		ins = generateInstancesFromInfo(i)
-		s   = newMetricsStore(&testStore{instances: ins})
+		s   = newMetricsStore(&testStore{instances: map[info]instances{i: ins}})
 	)
 
 	sins, err := s.getInstances(i)
@@ -243,6 +243,23 @@ func TestMetricsStore(t *testing.T) {
 	}
 
 	if want, got := ins, sins; !reflect.DeepEqual(want, got) {
+		t.Errorf("want %d instances, got %d", len(want), len(got))
+	}
+}
+
+func TestMetricsStoreGetServers(t *testing.T) {
+	var (
+		zone = "tt"
+		srvs = instances{{host: "foo"}}
+		m    = map[string]instances{zone: srvs}
+		s    = newMetricsStore(&testStore{servers: m})
+	)
+
+	ss, err := s.getServers(zone)
+	if err != nil {
+		t.Fatalf("want store to not return an error, got %s", err)
+	}
+	if want, got := srvs, ss; !reflect.DeepEqual(want, got) {
 		t.Errorf("want %d instances, got %d", len(want), len(got))
 	}
 }

@@ -3,15 +3,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/hashicorp/consul/api"
-	"github.com/miekg/dns"
 	"math/rand"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"reflect"
 	"testing"
+
+	"github.com/hashicorp/consul/api"
+	"github.com/miekg/dns"
 )
 
 // brokenStore implements the glimpse.store interface.
@@ -21,25 +21,26 @@ func (s *brokenStore) getInstances(srv info) (instances, error) {
 	return nil, newError(errConsulAPI, "could not get instances")
 }
 
+func (s *brokenStore) getServers(zone string) (instances, error) {
+	return nil, newError(errConsulAPI, "could not get servers")
+}
+
 // testStore implements the glimpse.store interface.
 type testStore struct {
-	instances []*instance
+	instances map[info]instances
+	servers   map[string]instances
 }
 
 func (s *testStore) getInstances(srv info) (instances, error) {
-	var r instances
-
-	for _, i := range s.instances {
-		if reflect.DeepEqual(srv, i.info) {
-			r = append(r, i)
-		}
-	}
-
-	if len(r) == 0 {
+	r, ok := s.instances[srv]
+	if !ok {
 		return nil, newError(errNoInstances, "")
 	}
-
 	return r, nil
+}
+
+func (s *testStore) getServers(zone string) (instances, error) {
+	return s.servers[zone], nil
 }
 
 // testWriter implements the dns.ResponseWriter interface.
@@ -104,8 +105,7 @@ func generateInstancesFromInfo(i info) instances {
 	)
 
 	for j := 0; j < n; j++ {
-		ins[j] = &instance{
-			info: i,
+		ins[j] = instance{
 			host: "suppenkasper",
 			ip:   net.ParseIP("1.2.3.4"),
 			port: uint16(20000 + j),

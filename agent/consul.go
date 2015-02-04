@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/hashicorp/consul/api"
 	consul "github.com/hashicorp/consul/consul/structs"
@@ -29,7 +30,7 @@ func (s *consulStore) getInstances(info info) (instances, error) {
 			Datacenter: info.zone,
 		}
 
-		is = []*instance{}
+		is = instances{}
 	)
 
 	// As the default we only retrieve healthy instances. Returning different
@@ -67,8 +68,7 @@ func (s *consulStore) getInstances(info info) (instances, error) {
 		}
 
 		if isEnv && isService {
-			is = append(is, &instance{
-				info: info,
+			is = append(is, instance{
 				host: e.Node.Node,
 				ip:   ip,
 				port: uint16(e.Service.Port),
@@ -77,6 +77,23 @@ func (s *consulStore) getInstances(info info) (instances, error) {
 	}
 
 	return is, nil
+}
+
+func (s *consulStore) getServers(zone string) (instances, error) {
+	members, err := s.client.Agent().Members(true)
+	if err != nil {
+		return nil, newError(errConsulAPI, "%s", err)
+	}
+	srvs := instances{}
+	for _, m := range members {
+		if strings.HasSuffix(m.Name, "."+zone) {
+			srvs = append(srvs, instance{
+				ip:   net.ParseIP(m.Addr),
+				host: strings.TrimSuffix(m.Name, "."+zone),
+			})
+		}
+	}
+	return srvs, nil
 }
 
 func filterEntries(entries []*api.ServiceEntry) []*api.ServiceEntry {

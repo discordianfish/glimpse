@@ -30,43 +30,44 @@ func TestDNSHandler(t *testing.T) {
 		}
 
 		store = &testStore{
-			instances: instances{
-				{
-					info: api,
-					host: "host1",
-					ip:   net.ParseIP("127.0.0.1"),
-					port: uint16(20000),
+			instances: map[info]instances{
+				api: instances{
+					{
+						host: "host1",
+						ip:   net.ParseIP("127.0.0.1"),
+						port: uint16(20000),
+					},
+					{
+						host: "host1",
+						ip:   net.ParseIP("127.0.0.1"),
+						port: uint16(20001),
+					},
+					{
+						host: "host2",
+						ip:   net.ParseIP("127.0.0.2"),
+						port: uint16(20000),
+					},
+					{
+						host: "host2",
+						ip:   net.ParseIP("127.0.0.2"),
+						port: uint16(20003),
+					},
 				},
-				{
-					info: api,
-					host: "host1",
-					ip:   net.ParseIP("127.0.0.1"),
-					port: uint16(20001),
+				web: instances{
+					{
+						host: "host3",
+						ip:   net.ParseIP("127.0.0.3"),
+						port: uint16(21000),
+					},
+					{
+						host: "host4",
+						ip:   net.ParseIP("127.0.0.4"),
+						port: uint16(21003),
+					},
 				},
-				{
-					info: api,
-					host: "host2",
-					ip:   net.ParseIP("127.0.0.2"),
-					port: uint16(20000),
-				},
-				{
-					info: api,
-					host: "host2",
-					ip:   net.ParseIP("127.0.0.2"),
-					port: uint16(20003),
-				},
-				{
-					info: web,
-					host: "host3",
-					ip:   net.ParseIP("127.0.0.3"),
-					port: uint16(21000),
-				},
-				{
-					info: web,
-					host: "host4",
-					ip:   net.ParseIP("127.0.0.4"),
-					port: uint16(21003),
-				},
+			},
+			servers: map[string]instances{
+				zone: instances{{host: "foo"}},
 			},
 		}
 
@@ -131,6 +132,20 @@ func TestDNSHandler(t *testing.T) {
 			answers:  2,
 		},
 		{
+			question: fmt.Sprintf("%s.%s", zone, domain),
+			qtype:    dns.TypeNS,
+			answers:  1,
+		},
+		{
+			question: fmt.Sprintf("xx.%s", domain),
+			qtype:    dns.TypeNS,
+		},
+		{
+			question: fmt.Sprintf("foo.%s.%s", zone, domain),
+			qtype:    dns.TypeNS,
+			rcode:    dns.RcodeNameError,
+		},
+		{
 			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
 			qtype:    dns.TypeAAAA,
 			rcode:    dns.RcodeNotImplemented,
@@ -138,11 +153,6 @@ func TestDNSHandler(t *testing.T) {
 		{
 			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
 			qtype:    dns.TypeMX,
-			rcode:    dns.RcodeNotImplemented,
-		},
-		{
-			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
-			qtype:    dns.TypeNS,
 			rcode:    dns.RcodeNotImplemented,
 		},
 		{
