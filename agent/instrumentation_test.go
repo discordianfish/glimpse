@@ -234,7 +234,7 @@ func TestMetricsStore(t *testing.T) {
 			zone:    "tt",
 		}
 		ins = generateInstancesFromInfo(i)
-		s   = newMetricsStore(&testStore{instances: ins})
+		s   = newMetricsStore(&testStore{instances: map[info]instances{i: ins}})
 	)
 
 	sins, err := s.getInstances(i)

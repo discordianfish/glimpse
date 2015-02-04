@@ -32,7 +32,6 @@ type store interface {
 type instances []*instance
 
 type instance struct {
-	info info
 	host string
 	ip   net.IP
 	port uint16
