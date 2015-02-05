@@ -2,8 +2,8 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
-	"io"
 	"net"
 	"os/exec"
 	"strconv"
@@ -219,32 +219,22 @@ func (s *metricsStore) getServers(zone string) (instances, error) {
 }
 
 func getConsulStats(bin string) (consulStats, error) {
-	info := exec.Command(bin, "info")
-
-	outPipe, err := info.StdoutPipe()
+	output, err := exec.Command(bin, "info").Output()
 	if err != nil {
 		return nil, err
 	}
 
-	if err := info.Start(); err != nil {
-		return nil, err
-	}
-
-	stats, err := parseConsulStats(outPipe)
+	stats, err := parseConsulStats(output)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := info.Wait(); err != nil {
 		return nil, err
 	}
 
 	return stats, nil
 }
 
-func parseConsulStats(r io.Reader) (consulStats, error) {
+func parseConsulStats(b []byte) (consulStats, error) {
 	var (
-		s     = bufio.NewScanner(r)
+		s     = bufio.NewScanner(bytes.NewBuffer(b))
 		stats = consulStats{}
 
 		ignoredFields = map[string]struct{}{
