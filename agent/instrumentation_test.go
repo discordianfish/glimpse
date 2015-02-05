@@ -61,7 +61,7 @@ func TestConsulCollectorParseServer(t *testing.T) {
 		t.Fatalf("parse failed: %s", err)
 	}
 
-	if want, got := 39, len(stats); want != got {
+	if want, got := 38, len(stats); want != got {
 		t.Errorf("want %d, got %d", want, got)
 	}
 
@@ -77,7 +77,6 @@ func TestConsulCollectorParseServer(t *testing.T) {
 		"raft_applied_index":       1712470,
 		"raft_commit_index":        1712470,
 		"raft_fsm_pending":         0,
-		"raft_last_contact":        0,
 		"raft_last_log_index":      1712470,
 		"raft_last_log_term":       131,
 		"raft_last_snapshot_index": 1708783,

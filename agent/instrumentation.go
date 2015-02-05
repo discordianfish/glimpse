@@ -238,10 +238,11 @@ func parseConsulStats(b []byte) (consulStats, error) {
 		stats = consulStats{}
 
 		ignoredFields = map[string]struct{}{
-			"arch":    struct{}{},
-			"os":      struct{}{},
-			"state":   struct{}{},
-			"version": struct{}{},
+			"arch":         struct{}{},
+			"os":           struct{}{},
+			"state":        struct{}{},
+			"version":      struct{}{},
+			"last_contact": struct{}{},
 		}
 		ignoredKeys = map[string]struct{}{
 			"build": struct{}{},

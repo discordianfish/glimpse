@@ -16,7 +16,7 @@ raft:
         applied_index = 1712470
         commit_index = 1712470
         fsm_pending = 0
-        last_contact = never
+        last_contact = 94.037416ms
         last_log_index = 1712470
         last_log_term = 131
         last_snapshot_index = 1708783
