@@ -84,127 +84,128 @@ func TestAgent(t *testing.T) {
 		}
 	}()
 
-	var (
-		q string
-	)
-
-	// success - SRV
-	q = dns.Fqdn(fmt.Sprintf("%s.%s.%s", testCase0.srvAddr, srvZone, dnsZone))
-
-	res, err := query(q, dns.TypeSRV, "udp")
-	if err != nil {
-		t.Fatalf("DNS lookup failed: %s", err)
-	}
-
-	want, got := dns.RcodeToString[dns.RcodeSuccess], dns.RcodeToString[res.Rcode]
-	if want != got {
-		t.Fatalf("%s: want rcode '%s', got '%s'", q, want, got)
-	}
-
-	if want, got := testCase0.instances, len(res.Answer); want != got {
-		t.Fatalf("want %d DNS result, got %d", want, got)
-	}
-
-	if want, got := q, res.Answer[0].Header().Name; want != got {
-		t.Fatalf("want '%s', got '%s'", want, got)
-	}
-
-	srv, ok := res.Answer[0].(*dns.SRV)
-	if !ok {
-		t.Fatalf("failed to extract SRV type")
-	}
-
-	if want, got := dns.Fqdn(nodeName), srv.Target; want != got {
-		t.Fatalf("want target %s, got %s", want, got)
-	}
-
-	if want, got := uint16(testCase0.port), srv.Port; want != got {
-		t.Fatalf("want port %d, got %d", want, got)
-	}
-
-	// success - A
-	q = dns.Fqdn(fmt.Sprintf("%s.%s.%s", testCase0.srvAddr, srvZone, dnsZone))
-
-	res, err = query(q, dns.TypeA, "udp")
-	if err != nil {
-		t.Fatalf("DNS lookup failed: %s", err)
-	}
-
-	want, got = dns.RcodeToString[dns.RcodeSuccess], dns.RcodeToString[res.Rcode]
-	if want != got {
-		t.Fatalf("want rcode '%s', got '%s'", want, got)
-	}
-
-	if want, got := testCase0.instances, len(res.Answer); want != got {
-		t.Fatalf("want %d DNS result, got %d", want, got)
-	}
-
-	if want, got := q, res.Answer[0].Header().Name; want != got {
-		t.Fatalf("want '%s', got '%s'", want, got)
-	}
-
-	a, ok := res.Answer[0].(*dns.A)
-	if !ok {
-		t.Fatalf("failed to extract A type")
-	}
-
-	if want, got := advertise, a.A.String(); want != got {
-		t.Fatalf("want A %s, got %s", want, got)
-	}
-
-	// success - NS
-	q = dns.Fqdn(fmt.Sprintf("%s.%s", srvZone, dnsZone))
-
-	res, err = query(q, dns.TypeNS, "udp")
-	if err != nil {
-		t.Fatalf("DNS lookup failed: %s", err)
-	}
-
-	want, got = dns.RcodeToString[dns.RcodeSuccess], dns.RcodeToString[res.Rcode]
-	if want != got {
-		t.Fatalf("want rcode '%s', got '%s'", want, got)
-	}
-
-	if want, got := 1, len(res.Answer); want != got {
-		t.Fatalf("want %d DNS result, got %d", want, got)
-	}
-
-	if want, got := q, res.Answer[0].Header().Name; want != got {
-		t.Fatalf("want '%s', got '%s'", want, got)
-	}
-
-	ns, ok := res.Answer[0].(*dns.NS)
-	if !ok {
-		t.Fatalf("failed to extract NS type")
-	}
-
-	if want, got := dns.Fqdn(nodeName), ns.Ns; want != got {
-		t.Fatalf("want NS %s, got %s", want, got)
-	}
-
-	// fail - non-existent DNS zone
-	for _, q := range []string{
-		dns.Fqdn(testCase0.srvAddr),
-		dns.Fqdn(fmt.Sprintf("%s.%s", testCase0.srvAddr, srvZone)),
-		dns.Fqdn(fmt.Sprintf("%s.%s", testCase0.srvAddr, dnsZone)),
-		dns.Fqdn(fmt.Sprintf("%s.%s.example.domain", testCase0.srvAddr, srvZone)),
-		dns.Fqdn(fmt.Sprintf("foo.bar.baz.qux.%s.%s", srvZone, dnsZone)),
+	for _, test := range []struct {
+		query   string
+		qtype   uint16
+		net     string
+		rcode   int
+		answers []string
+	}{
+		{
+			query:   dns.Fqdn(fmt.Sprintf("%s.%s.%s", testCase0.srvAddr, srvZone, dnsZone)),
+			qtype:   dns.TypeA,
+			net:     "udp",
+			answers: []string{advertise},
+		},
+		{
+			query:   dns.Fqdn(fmt.Sprintf("%s.%s.%s", testCase0.srvAddr, srvZone, dnsZone)),
+			qtype:   dns.TypeA,
+			net:     "tcp",
+			answers: []string{advertise},
+		},
+		{
+			query:   dns.Fqdn(fmt.Sprintf("%s.%s.%s", testCase0.srvAddr, srvZone, dnsZone)),
+			qtype:   dns.TypeSRV,
+			net:     "udp",
+			answers: []string{fmt.Sprintf("%s.:%d", nodeName, testCase0.port)},
+		},
+		{
+			query:   dns.Fqdn(fmt.Sprintf("%s.%s.%s", testCase0.srvAddr, srvZone, dnsZone)),
+			qtype:   dns.TypeSRV,
+			net:     "tcp",
+			answers: []string{fmt.Sprintf("%s.:%d", nodeName, testCase0.port)},
+		},
+		{
+			query:   dns.Fqdn(fmt.Sprintf("%s.%s", srvZone, dnsZone)),
+			qtype:   dns.TypeNS,
+			net:     "udp",
+			answers: []string{dns.Fqdn(nodeName)},
+		},
+		{
+			query: dns.Fqdn(testCase0.srvAddr),
+			qtype: dns.TypeSRV,
+			net:   "udp",
+			rcode: dns.RcodeNameError,
+		},
+		{
+			query: dns.Fqdn(fmt.Sprintf("%s.%s", testCase0.srvAddr, srvZone)),
+			qtype: dns.TypeSRV,
+			net:   "udp",
+			rcode: dns.RcodeNameError,
+		},
+		{
+			query: dns.Fqdn(fmt.Sprintf("%s.%s", testCase0.srvAddr, dnsZone)),
+			qtype: dns.TypeSRV,
+			net:   "udp",
+			rcode: dns.RcodeNameError,
+		},
+		{
+			query: dns.Fqdn(fmt.Sprintf("%s.%s.example.domain", testCase0.srvAddr, srvZone)),
+			qtype: dns.TypeSRV,
+			net:   "udp",
+			rcode: dns.RcodeNameError,
+		},
+		{
+			query: dns.Fqdn(fmt.Sprintf("foo.bar.baz.qux.%s.%s", srvZone, dnsZone)),
+			qtype: dns.TypeSRV,
+			net:   "udp",
+			rcode: dns.RcodeNameError,
+		},
 	} {
-		res, err := query(q, dns.TypeSRV, "udp")
+		res, err := query(test.query, test.qtype, test.net)
 		if err != nil {
 			t.Fatalf("DNS lookup failed: %s", err)
 		}
+		if want, got := test.rcode, res.Rcode; want != got {
+			m := dns.RcodeToString
+			t.Fatalf("want rcode '%s', got '%s'", m[want], m[got])
+		}
+		if want, got := len(test.answers), len(res.Answer); want != got {
+			t.Fatalf("want %d answers, got %d", want, got)
+		}
+		for i, answer := range res.Answer {
+			if want, got := test.query, answer.Header().Name; want != got {
+				t.Fatalf("want '%s', got '%s'", want, got)
+			}
 
-		want, got := dns.RcodeToString[dns.RcodeNameError], dns.RcodeToString[res.Rcode]
-		if want != got {
-			t.Fatalf("%s: want rcode '%s', got '%s'", q, want, got)
+			switch test.qtype {
+			case dns.TypeA:
+				a, ok := answer.(*dns.A)
+				if !ok {
+					t.Fatalf("failed to extract A type")
+				}
+				if want, got := test.answers[i], a.A.String(); want != got {
+					t.Fatalf("want A %s, got %s", want, got)
+				}
+			case dns.TypeSRV:
+				srv, ok := answer.(*dns.SRV)
+				if !ok {
+					t.Fatalf("failed to extract SRV type")
+				}
+				s := strings.Split(test.answers[i], ":")
+				if want, got := s[0], srv.Target; want != got {
+					t.Fatalf("want target %s, got %s", want, got)
+				}
+				p, _ := strconv.Atoi(s[1])
+				if want, got := uint16(p), srv.Port; want != got {
+					t.Fatalf("want port %d, got %d", want, got)
+				}
+			case dns.TypeNS:
+				ns, ok := answer.(*dns.NS)
+				if !ok {
+					t.Fatalf("failed to extract NS type")
+				}
+				if want, got := test.answers[i], ns.Ns; want != got {
+					t.Fatalf("want NS %s, got %s", want, got)
+				}
+			}
 		}
 	}
 
-	// success - TCP
-	q = dns.Fqdn(fmt.Sprintf("%s.%s.%s", testCase1.srvAddr, srvZone, dnsZone))
+	// truncation
+	q := dns.Fqdn(fmt.Sprintf("%s.%s.%s", testCase1.srvAddr, srvZone, dnsZone))
 
-	res, err = query(q, dns.TypeSRV, "udp")
+	res, err := query(q, dns.TypeSRV, "udp")
 	if err != nil {
 		t.Fatalf("DNS/udp lookup failed: %s", err)
 	}
@@ -213,21 +214,7 @@ func TestAgent(t *testing.T) {
 		t.Fatalf("want msg truncated, got '%t'", got)
 	}
 
-	res, err = query(q, dns.TypeSRV, "tcp")
-	if err != nil {
-		t.Fatalf("DNS/tcp lookup failed: %s", err)
-	}
-
-	want, got = dns.RcodeToString[dns.RcodeSuccess], dns.RcodeToString[res.Rcode]
-	if want != got {
-		t.Fatalf("%s: want rcode '%s', got '%s'", q, want, got)
-	}
-
-	if want, got := testCase1.instances, len(res.Answer); want != got {
-		t.Fatalf("want %d DNS result, got %d", want, got)
-	}
-
-	// success - metrics
+	// metrics
 	m, err := http.Get(fmt.Sprintf("http://%s/metrics", httpAddr))
 	if err != nil {
 		t.Errorf("HTTP metrics request failed: %s", err)
