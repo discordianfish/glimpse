@@ -43,7 +43,7 @@ release: $(AGENT_TAR)
 .PHONY: build try clean test unit-test acceptance-test release
 .SUFFIXES: # Disable default suffixes
 
-$(AGENT_BIN): $(GODEP) *.go
+$(AGENT_BIN): $(GODEP) *.go Makefile
 	$(GODEP) go build $(AGENT_FLG) -o $@
 
 $(AGENT_TAR): $(AGENT_BIN)
