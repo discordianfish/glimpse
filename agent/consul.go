@@ -86,11 +86,12 @@ func (s *consulStore) getServers(zone string) (instances, error) {
 	}
 	srvs := instances{}
 	for _, m := range members {
-		if strings.HasSuffix(m.Name, "."+zone) {
-			srvs = append(srvs, instance{
-				ip:   net.ParseIP(m.Addr),
-				host: strings.TrimSuffix(m.Name, "."+zone),
-			})
+		if zone == "" || strings.HasSuffix(m.Name, "."+zone) {
+			n := m.Name
+			if i := strings.LastIndex(n, "."); i > 0 {
+				n = n[:i]
+			}
+			srvs = append(srvs, instance{ip: net.ParseIP(m.Addr), host: n})
 		}
 	}
 	return srvs, nil

@@ -40,7 +40,7 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 
 		q = req.Question[0]
 
-		if !strings.HasSuffix(q.Name, "."+domain) {
+		if !strings.HasSuffix(q.Name, domain) {
 			log.Printf("[warning] dns - unknown domain %s (authoritative zone: %s)", q.Name, domain)
 			res.SetRcode(req, dns.RcodeNameError)
 			goto respond
@@ -48,7 +48,10 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 
 		// Trim domain as it is not relevant for the extraction from the
 		// service address.
-		addr = strings.TrimSuffix(q.Name, "."+domain)
+		addr = ""
+		if i := strings.LastIndex(q.Name, "."+domain); i > 0 {
+			addr = q.Name[:i]
+		}
 
 		switch q.Qtype {
 		case dns.TypeA, dns.TypeSRV:
@@ -77,9 +80,11 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 				res.Answer = append(res.Answer, newRR(q, i))
 			}
 		case dns.TypeNS:
-			if err := validateZone(addr); err != nil {
-				res.SetRcode(req, dns.RcodeNameError)
-				goto respond
+			if addr != "" {
+				if err := validateZone(addr); err != nil {
+					res.SetRcode(req, dns.RcodeNameError)
+					goto respond
+				}
 			}
 
 			instances, err = store.getServers(addr)

@@ -40,7 +40,15 @@ func (s *testStore) getInstances(srv info) (instances, error) {
 }
 
 func (s *testStore) getServers(zone string) (instances, error) {
-	return s.servers[zone], nil
+	if zone != "" {
+		return s.servers[zone], nil
+	}
+
+	r := instances{}
+	for _, s := range s.servers {
+		r = append(r, s...)
+	}
+	return r, nil
 }
 
 // testWriter implements the dns.ResponseWriter interface.

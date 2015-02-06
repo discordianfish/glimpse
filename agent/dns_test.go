@@ -137,6 +137,11 @@ func TestDNSHandler(t *testing.T) {
 			answers:  1,
 		},
 		{
+			question: domain,
+			qtype:    dns.TypeNS,
+			answers:  1,
+		},
+		{
 			question: fmt.Sprintf("xx.%s", domain),
 			qtype:    dns.TypeNS,
 		},

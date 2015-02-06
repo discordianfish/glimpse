@@ -158,13 +158,14 @@ func TestConsulGetServers(t *testing.T) {
 		{zone: "bb", want: []string{"baz"}},
 		{zone: "bc", want: []string{"qux"}},
 		{zone: "dd", want: []string{}},
+		{zone: "", want: []string{"foo", "bar", "baz", "qux"}},
 	} {
 		s, err := store.getServers(test.zone)
 		if err != nil {
 			t.Fatalf("getServers failed: %s", err)
 		}
 		if want, got := len(test.want), len(s); want != got {
-			t.Errorf("want %d servers, got %d", want, got)
+			t.Fatalf("want %d servers, got %d", want, got)
 		}
 		for i, w := range test.want {
 			if want, got := w, s[i].host; want != got {

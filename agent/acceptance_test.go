@@ -122,6 +122,18 @@ func TestAgent(t *testing.T) {
 			answers: []string{dns.Fqdn(nodeName)},
 		},
 		{
+			query:   dns.Fqdn(fmt.Sprintf("%s.%s", srvZone, dnsZone)),
+			qtype:   dns.TypeNS,
+			net:     "tcp",
+			answers: []string{dns.Fqdn(nodeName)},
+		},
+		{
+			query:   dns.Fqdn(dnsZone),
+			qtype:   dns.TypeNS,
+			net:     "udp",
+			answers: []string{dns.Fqdn(nodeName)},
+		},
+		{
 			query: dns.Fqdn(testCase0.srvAddr),
 			qtype: dns.TypeSRV,
 			net:   "udp",
@@ -158,14 +170,14 @@ func TestAgent(t *testing.T) {
 		}
 		if want, got := test.rcode, res.Rcode; want != got {
 			m := dns.RcodeToString
-			t.Fatalf("want rcode '%s', got '%s'", m[want], m[got])
+			t.Fatalf("%s want rcode '%s', got '%s'", test.query, m[want], m[got])
 		}
 		if want, got := len(test.answers), len(res.Answer); want != got {
-			t.Fatalf("want %d answers, got %d", want, got)
+			t.Fatalf("%s want %d answers, got %d", test.query, want, got)
 		}
 		for i, answer := range res.Answer {
 			if want, got := test.query, answer.Header().Name; want != got {
-				t.Fatalf("want '%s', got '%s'", want, got)
+				t.Fatalf("%s want '%s', got '%s'", test.query, want, got)
 			}
 
 			switch test.qtype {
