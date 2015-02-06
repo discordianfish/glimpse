@@ -58,33 +58,7 @@ var (
 )
 
 func TestAgent(t *testing.T) {
-	consul, err := runConsul()
-	if err != nil {
-		t.Fatalf("consul failed: %s", err)
-	}
-	defer consul.terminate()
-
-	go func() {
-		err := <-consul.errc
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	agent, err := runAgent()
-	if err != nil {
-		t.Fatalf("agent failed: %s", err)
-	}
-	defer agent.terminate()
-
-	go func() {
-		err := <-agent.errc
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	for _, test := range []struct {
+	tests := []struct {
 		query   string
 		qtype   uint16
 		net     string
@@ -163,7 +137,35 @@ func TestAgent(t *testing.T) {
 			net:   "udp",
 			rcode: dns.RcodeNameError,
 		},
-	} {
+	}
+
+	consul, err := runConsul()
+	if err != nil {
+		t.Fatalf("consul failed: %s", err)
+	}
+	defer consul.terminate()
+
+	go func() {
+		err := <-consul.errc
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	agent, err := runAgent()
+	if err != nil {
+		t.Fatalf("agent failed: %s", err)
+	}
+	defer agent.terminate()
+
+	go func() {
+		err := <-agent.errc
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	for _, test := range tests {
 		res, err := query(test.query, test.qtype, test.net)
 		if err != nil {
 			t.Fatalf("DNS lookup failed: %s", err)
