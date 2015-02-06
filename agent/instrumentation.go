@@ -85,14 +85,14 @@ func dnsMetricsHandler(next dns.Handler) dns.HandlerFunc {
 		}
 
 		if len(req.Question) == 1 {
-			qtype = strings.ToLower(dns.TypeToString[req.Question[0].Qtype])
+			qtype = dns.TypeToString[req.Question[0].Qtype]
 		}
 
 		next.ServeDNS(buffer, req)
 
 		if buffer.msg != nil {
 			w.WriteMsg(buffer.msg)
-			rcode = strings.ToLower(dns.RcodeToString[buffer.msg.Rcode])
+			rcode = dns.RcodeToString[buffer.msg.Rcode]
 		}
 
 		duration := float64(time.Since(start)) / float64(time.Microsecond)
