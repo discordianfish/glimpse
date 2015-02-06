@@ -66,73 +66,73 @@ func TestAgent(t *testing.T) {
 		answers []string
 	}{
 		{
-			query:   dns.Fqdn(fmt.Sprintf("%s.%s.%s", testCase0.srvAddr, srvZone, dnsZone)),
+			query:   fqdn(testCase0.srvAddr, srvZone, dnsZone),
 			qtype:   dns.TypeA,
 			net:     "udp",
 			answers: []string{advertise},
 		},
 		{
-			query:   dns.Fqdn(fmt.Sprintf("%s.%s.%s", testCase0.srvAddr, srvZone, dnsZone)),
+			query:   fqdn(testCase0.srvAddr, srvZone, dnsZone),
 			qtype:   dns.TypeA,
 			net:     "tcp",
 			answers: []string{advertise},
 		},
 		{
-			query:   dns.Fqdn(fmt.Sprintf("%s.%s.%s", testCase0.srvAddr, srvZone, dnsZone)),
+			query:   fqdn(testCase0.srvAddr, srvZone, dnsZone),
 			qtype:   dns.TypeSRV,
 			net:     "udp",
 			answers: []string{fmt.Sprintf("%s.:%d", nodeName, testCase0.port)},
 		},
 		{
-			query:   dns.Fqdn(fmt.Sprintf("%s.%s.%s", testCase0.srvAddr, srvZone, dnsZone)),
+			query:   fqdn(testCase0.srvAddr, srvZone, dnsZone),
 			qtype:   dns.TypeSRV,
 			net:     "tcp",
 			answers: []string{fmt.Sprintf("%s.:%d", nodeName, testCase0.port)},
 		},
 		{
-			query:   dns.Fqdn(fmt.Sprintf("%s.%s", srvZone, dnsZone)),
+			query:   fqdn(srvZone, dnsZone),
 			qtype:   dns.TypeNS,
 			net:     "udp",
-			answers: []string{dns.Fqdn(nodeName)},
+			answers: []string{fqdn(nodeName)},
 		},
 		{
-			query:   dns.Fqdn(fmt.Sprintf("%s.%s", srvZone, dnsZone)),
+			query:   fqdn(srvZone, dnsZone),
 			qtype:   dns.TypeNS,
 			net:     "tcp",
-			answers: []string{dns.Fqdn(nodeName)},
+			answers: []string{fqdn(nodeName)},
 		},
 		{
-			query:   dns.Fqdn(dnsZone),
+			query:   fqdn(dnsZone),
 			qtype:   dns.TypeNS,
 			net:     "udp",
-			answers: []string{dns.Fqdn(nodeName)},
+			answers: []string{fqdn(nodeName)},
 		},
 		{
-			query: dns.Fqdn(testCase0.srvAddr),
+			query: fqdn(testCase0.srvAddr),
 			qtype: dns.TypeSRV,
 			net:   "udp",
 			rcode: dns.RcodeNameError,
 		},
 		{
-			query: dns.Fqdn(fmt.Sprintf("%s.%s", testCase0.srvAddr, srvZone)),
+			query: fqdn(testCase0.srvAddr, srvZone),
 			qtype: dns.TypeSRV,
 			net:   "udp",
 			rcode: dns.RcodeNameError,
 		},
 		{
-			query: dns.Fqdn(fmt.Sprintf("%s.%s", testCase0.srvAddr, dnsZone)),
+			query: fqdn(testCase0.srvAddr, dnsZone),
 			qtype: dns.TypeSRV,
 			net:   "udp",
 			rcode: dns.RcodeNameError,
 		},
 		{
-			query: dns.Fqdn(fmt.Sprintf("%s.%s.example.domain", testCase0.srvAddr, srvZone)),
+			query: fqdn(testCase0.srvAddr, srvZone, "example.domain"),
 			qtype: dns.TypeSRV,
 			net:   "udp",
 			rcode: dns.RcodeNameError,
 		},
 		{
-			query: dns.Fqdn(fmt.Sprintf("foo.bar.baz.qux.%s.%s", srvZone, dnsZone)),
+			query: fqdn("foo.bar.baz.qux", srvZone, dnsZone),
 			qtype: dns.TypeSRV,
 			net:   "udp",
 			rcode: dns.RcodeNameError,
@@ -217,7 +217,7 @@ func TestAgent(t *testing.T) {
 	}
 
 	// truncation
-	q := dns.Fqdn(fmt.Sprintf("%s.%s.%s", testCase1.srvAddr, srvZone, dnsZone))
+	q := fqdn(testCase1.srvAddr, srvZone, dnsZone)
 
 	res, err := query(q, dns.TypeSRV, "udp")
 	if err != nil {

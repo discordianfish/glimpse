@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/consul/api"
@@ -69,6 +70,11 @@ func (w *testWriter) Close() error                { return nil }
 func (w *testWriter) TsigStatus() error           { return nil }
 func (w *testWriter) TsigTimersOnly(b bool)       {}
 func (w *testWriter) Hijack()                     {}
+
+// helpers
+func fqdn(s ...string) string {
+	return dns.Fqdn(strings.Join(s, "."))
+}
 
 func createServiceEntry(
 	i info,
