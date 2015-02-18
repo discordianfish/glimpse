@@ -31,7 +31,7 @@ var (
 func main() {
 	var (
 		consulAddr = flag.String("consul.addr", "127.0.0.1:8500", "consul lookup address")
-		consulBin  = flag.String("consul.bin", "consul", "location of the consul binary")
+		consulInfo = flag.String("consul.info", "consul info", "info command")
 		dnsAddr    = flag.String("dns.addr", ":5959", "DNS address to bind to")
 		maxAnswers = flag.Int("dns.udp.maxanswers", defaultMaxAnswers, "DNS maximum answers returned via UDP")
 		dnsZone    = flag.String("dns.zone", defaultDNSZone, "DNS zone")
@@ -93,7 +93,7 @@ func main() {
 		log.Printf("[info] HTTP listening on %s\n", addr)
 		errc <- http.ListenAndServe(addr, nil)
 	}(*httpAddr, errc)
-	go registerConsulCollector(*consulBin, errc)
+	go registerConsulCollector(*consulInfo, errc)
 
 	for {
 		select {
@@ -108,13 +108,13 @@ func runDNSServer(server *dns.Server, errc chan error) {
 	errc <- server.ListenAndServe()
 }
 
-func registerConsulCollector(consulBin string, errc chan error) {
-	c := newConsulCollector(consulBin, errc)
+func registerConsulCollector(consulInfo string, errc chan error) {
+	c := newConsulCollector(consulInfo, errc)
 
 	for {
 		if err := prometheus.Register(c); err != nil {
 			log.Printf("[error] prometheus - could not register collector"+
-				" (-consul.bin=%s)", consulBin)
+				" (-consul.info=%s)", consulInfo)
 			<-time.After(1 * time.Second)
 			continue
 		}

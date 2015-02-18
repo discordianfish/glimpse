@@ -102,14 +102,14 @@ func dnsMetricsHandler(next dns.Handler) dns.HandlerFunc {
 
 // consulCollector implements the prometheus.Collector interface.
 type consulCollector struct {
-	bin     string
+	info    string
 	errc    chan error
 	metrics map[string]prometheus.Gauge
 }
 
-func newConsulCollector(bin string, errc chan error) prometheus.Collector {
+func newConsulCollector(info string, errc chan error) prometheus.Collector {
 	return &consulCollector{
-		bin:     bin,
+		info:    info,
 		errc:    errc,
 		metrics: map[string]prometheus.Gauge{},
 	}
@@ -141,7 +141,7 @@ func (c *consulCollector) Describe(descc chan<- *prometheus.Desc) {
 }
 
 func (c *consulCollector) updateMetrics() error {
-	stats, err := getConsulStats(c.bin)
+	stats, err := getConsulStats(c.info)
 	if err != nil {
 		return fmt.Errorf("consul info failed: %s", err)
 	}
@@ -218,8 +218,9 @@ func (s *metricsStore) getServers(zone string) (instances, error) {
 	return r, err
 }
 
-func getConsulStats(bin string) (consulStats, error) {
-	output, err := exec.Command(bin, "info").Output()
+func getConsulStats(info string) (consulStats, error) {
+	cmd := strings.Split(info, " ")
+	output, err := exec.Command(cmd[0], cmd[1:]...).Output()
 	if err != nil {
 		return nil, err
 	}

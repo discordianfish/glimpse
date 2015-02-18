@@ -351,7 +351,7 @@ func query(q string, t uint16, net string) (*dns.Msg, error) {
 
 func runAgent() (*cmd, error) {
 	args := []string{
-		"-consul.bin", consulBin,
+		"-consul.info", consulBin + " info -rpc localhost:8400",
 		"-dns.addr", dnsAddr,
 		"-dns.udp.maxanswers", strconv.Itoa(dnsMaxAnswers),
 		"-dns.zone", dnsZone,
