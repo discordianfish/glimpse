@@ -250,6 +250,7 @@ func TestAgent(t *testing.T) {
 		`glimpse_agent_consul_responses`,
 		`process_open_fds`,
 		`consul_process_open_fds`,
+		`consul_raft_num_peers`,
 	} {
 		if !strings.Contains(string(body), metric) {
 			t.Errorf("want %s in HTTP body:\n%s", metric, string(body))
@@ -351,7 +352,7 @@ func query(q string, t uint16, net string) (*dns.Msg, error) {
 
 func runAgent() (*cmd, error) {
 	args := []string{
-		"-consul.info", consulBin + " info -rpc localhost:8400",
+		"-consul.info", consulBin + " info -rpc-addr localhost:8400",
 		"-dns.addr", dnsAddr,
 		"-dns.udp.maxanswers", strconv.Itoa(dnsMaxAnswers),
 		"-dns.zone", dnsZone,
