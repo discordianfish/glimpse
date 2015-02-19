@@ -180,6 +180,10 @@ func TestDNSHandler(t *testing.T) {
 			t.Errorf("want available recursion %t, got %t", want, got)
 		}
 
+		if want, got := true, r.Compress; want != got {
+			t.Errorf("want message compression %t, got %t", want, got)
+		}
+
 		if want, got := r.Rcode == dns.RcodeSuccess, r.Authoritative; want != got {
 			t.Errorf("want authoritative %t, got %t", want, got)
 		}
