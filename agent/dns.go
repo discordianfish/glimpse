@@ -26,6 +26,7 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 		)
 
 		res.SetReply(req)
+		res.Compress = true
 
 		if len(req.Question) == 0 {
 			res.SetRcode(req, dns.RcodeFormatError)
