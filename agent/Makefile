@@ -12,7 +12,7 @@ CONSUL_ZIP := $(CONSUL_VER)_$(OS)_$(ARCH).zip
 CONSUL_URL := "https://dl.bintray.com/mitchellh/consul/$(CONSUL_ZIP)"
 
 AGENT_BIN := glimpse-agent
-AGENT_VER := 0.3.2
+AGENT_VER := 0.3.3
 AGENT_TAR := $(AGENT_BIN)-$(AGENT_VER)_$(OS)_$(ARCH).tar.gz
 AGENT_DST ?= http://ent/iss/glimpse
 AGENT_FLG := -ldflags " -X main.version $(AGENT_VER)"
