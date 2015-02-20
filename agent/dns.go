@@ -42,7 +42,7 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 		q = req.Question[0]
 
 		if !strings.HasSuffix(q.Name, domain) {
-			log.Printf("[warning] dns - unknown domain %s (authoritative zone: %s)", q.Name, domain)
+			log.Printf("[warning] DNS - unknown domain %s (authoritative zone: %s)", q.Name, domain)
 			res.SetRcode(req, dns.RcodeNameError)
 			goto respond
 		}
@@ -58,7 +58,7 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 		case dns.TypeA, dns.TypeSRV:
 			srv, err = infoFromAddr(addr)
 			if err != nil {
-				log.Printf("[warning] dns - address parsing failed '%s': %s", q.Name, err)
+				log.Printf("[warning] DNS - address parsing failed '%s': %s", q.Name, err)
 				res.SetRcode(req, dns.RcodeNameError)
 				goto respond
 			}
@@ -109,7 +109,7 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 	respond:
 		err = w.WriteMsg(res)
 		if err != nil {
-			log.Printf("[error] dns - write msg failed: %s", err)
+			log.Printf("[error] DNS - write msg failed: %s", err)
 		}
 
 		reqInfo := dns.TypeToString[q.Qtype] + " " + q.Name
@@ -118,7 +118,7 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 		}
 		// TODO(alx): Put logging in central place for control in different
 		//            environemnts.
-		log.Printf("[info] dns - request: %s response: %s (%d rrs)",
+		log.Printf("[info] DNS - request: %s response: %s (%d rrs)",
 			reqInfo, dns.RcodeToString[res.Rcode], len(res.Answer))
 	}
 }
