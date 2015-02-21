@@ -6,7 +6,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"regexp"
+	"syscall"
 	"time"
 
 	"github.com/hashicorp/consul/api"
@@ -95,12 +97,19 @@ func main() {
 		err := http.ListenAndServe(addr, nil)
 		errc <- fmt.Errorf("[error] HTTP - server failed: %s", err)
 	}(*httpAddr, errc)
+	go func(errc chan<- error) { errc <- interrupt() }(errc)
 
 	if *consulInfo != "" {
 		go registerConsulCollector(*consulInfo)
 	}
 
 	log.Fatalln(<-errc)
+}
+
+func interrupt() error {
+	c := make(chan os.Signal)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	return fmt.Errorf("[info] got signal: %s. Good bye.", <-c)
 }
 
 func runDNSServer(server *dns.Server, errc chan error) {
