@@ -2,10 +2,13 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"regexp"
+	"syscall"
 	"time"
 
 	"github.com/hashicorp/consul/api"
@@ -91,25 +94,32 @@ func main() {
 	}, errc)
 	go func(addr string, errc chan<- error) {
 		log.Printf("[info] HTTP listening on %s\n", addr)
-		errc <- http.ListenAndServe(addr, nil)
+		err := http.ListenAndServe(addr, nil)
+		errc <- fmt.Errorf("[error] HTTP - server failed: %s", err)
 	}(*httpAddr, errc)
-	go registerConsulCollector(*consulInfo, errc)
+	go func(errc chan<- error) { errc <- interrupt() }(errc)
 
-	for {
-		select {
-		case err := <-errc:
-			log.Printf("[error] prometheus - collect failed: %s", err)
-		}
+	if *consulInfo != "" {
+		go registerConsulCollector(*consulInfo)
 	}
+
+	log.Fatalln(<-errc)
+}
+
+func interrupt() error {
+	c := make(chan os.Signal)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	return fmt.Errorf("[info] got signal: %s. Good bye.", <-c)
 }
 
 func runDNSServer(server *dns.Server, errc chan error) {
 	log.Printf("[info] DNS/%s listening on %s\n", server.Net, server.Addr)
-	errc <- server.ListenAndServe()
+	err := server.ListenAndServe()
+	errc <- fmt.Errorf("[error] DNS/%s - server failed: %s", server.Net, err)
 }
 
-func registerConsulCollector(consulInfo string, errc chan error) {
-	c := newConsulCollector(consulInfo, errc)
+func registerConsulCollector(consulInfo string) {
+	c := newConsulCollector(consulInfo)
 
 	for {
 		if err := prometheus.Register(c); err != nil {

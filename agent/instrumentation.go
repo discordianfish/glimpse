@@ -114,14 +114,12 @@ func dnsMetricsHandler(next dns.Handler) dns.HandlerFunc {
 // consulCollector implements the prometheus.Collector interface.
 type consulCollector struct {
 	info    string
-	errc    chan error
 	metrics map[string]prometheus.Gauge
 }
 
-func newConsulCollector(info string, errc chan error) prometheus.Collector {
+func newConsulCollector(info string) prometheus.Collector {
 	return &consulCollector{
 		info:    info,
-		errc:    errc,
 		metrics: map[string]prometheus.Gauge{},
 	}
 }
@@ -129,7 +127,6 @@ func newConsulCollector(info string, errc chan error) prometheus.Collector {
 func (c *consulCollector) Collect(metricc chan<- prometheus.Metric) {
 	err := c.updateMetrics()
 	if err != nil {
-		c.errc <- err
 		return
 	}
 
@@ -142,7 +139,6 @@ func (c *consulCollector) Collect(metricc chan<- prometheus.Metric) {
 func (c *consulCollector) Describe(descc chan<- *prometheus.Desc) {
 	err := c.updateMetrics()
 	if err != nil {
-		c.errc <- err
 		return
 	}
 
