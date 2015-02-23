@@ -134,7 +134,11 @@ func TestDnsMetricsHandler(t *testing.T) {
 	r := w.msg
 
 	if want, got := dns.RcodeNotImplemented, r.Rcode; want != got {
-		t.Errorf("want rcode %s, got %s", dns.RcodeToString[want], dns.RcodeToString[got])
+		t.Errorf(
+			"want rcode %s, got %s",
+			dns.RcodeToString[want],
+			dns.RcodeToString[got],
+		)
 	}
 }
 

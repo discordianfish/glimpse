@@ -25,7 +25,7 @@ const (
 )
 
 var (
-	// ldflag
+	// Set during buildtime.
 	version = "0.0.0.dev"
 
 	rDNSZone = regexp.MustCompile(`^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6}$`)
@@ -36,10 +36,14 @@ func main() {
 		consulAddr = flag.String("consul.addr", "127.0.0.1:8500", "consul lookup address")
 		consulInfo = flag.String("consul.info", "consul info", "info command")
 		dnsAddr    = flag.String("dns.addr", ":5959", "DNS address to bind to")
-		maxAnswers = flag.Int("dns.udp.maxanswers", defaultMaxAnswers, "DNS maximum answers returned via UDP")
 		dnsZone    = flag.String("dns.zone", defaultDNSZone, "DNS zone")
 		srvZone    = flag.String("srv.zone", defaultSrvZone, "srv zone")
 		httpAddr   = flag.String("http.addr", ":5960", "HTTP address to bind to")
+		maxAnswers = flag.Int(
+			"dns.udp.maxanswers",
+			defaultMaxAnswers,
+			"DNS maximum answers returned via UDP",
+		)
 	)
 	flag.Parse()
 
@@ -82,21 +86,29 @@ func main() {
 		),
 	)
 
+	// DNS TCP server
 	go runDNSServer(&dns.Server{
 		Addr:    *dnsAddr,
 		Handler: dnsMux,
 		Net:     "tcp",
 	}, errc)
+	// DNS UDP server
 	go runDNSServer(&dns.Server{
 		Addr:    *dnsAddr,
 		Handler: dnsMux,
 		Net:     "udp",
 	}, errc)
+
+	// HTTP server
 	go func(addr string, errc chan<- error) {
 		log.Printf("[info] HTTP listening on %s\n", addr)
-		err := http.ListenAndServe(addr, nil)
-		errc <- fmt.Errorf("[error] HTTP - server failed: %s", err)
+		errc <- fmt.Errorf(
+			"[error] HTTP - server failed: %s",
+			http.ListenAndServe(addr, nil),
+		)
 	}(*httpAddr, errc)
+
+	// Signal handling
 	go func(errc chan<- error) { errc <- interrupt() }(errc)
 
 	if *consulInfo != "" {
@@ -109,13 +121,15 @@ func main() {
 func interrupt() error {
 	c := make(chan os.Signal)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-	return fmt.Errorf("[info] got signal: %s. Good bye.", <-c)
+	return fmt.Errorf("[info] got signal: %s. Good bye", <-c)
 }
 
 func runDNSServer(server *dns.Server, errc chan error) {
 	log.Printf("[info] DNS/%s listening on %s\n", server.Net, server.Addr)
-	err := server.ListenAndServe()
-	errc <- fmt.Errorf("[error] DNS/%s - server failed: %s", server.Net, err)
+	errc <- fmt.Errorf(
+		"[error] DNS/%s - server failed: %s", server.Net,
+		server.ListenAndServe(),
+	)
 }
 
 func registerConsulCollector(consulInfo string) {
@@ -123,8 +137,10 @@ func registerConsulCollector(consulInfo string) {
 
 	for {
 		if err := prometheus.Register(c); err != nil {
-			log.Printf("[error] prometheus - could not register collector"+
-				" (-consul.info=%s)", consulInfo)
+			log.Printf(
+				"[error] prometheus - could not register collector (-consul.info=%s)",
+				consulInfo,
+			)
 			<-time.After(1 * time.Second)
 			continue
 		}

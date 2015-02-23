@@ -42,7 +42,11 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 		q = req.Question[0]
 
 		if !strings.HasSuffix(q.Name, domain) {
-			log.Printf("[warning] DNS - unknown domain %s (authoritative zone: %s)", q.Name, domain)
+			log.Printf(
+				"[warning] DNS - unknown domain %s (authoritative zone: %s)",
+				q.Name,
+				domain,
+			)
 			res.SetRcode(req, dns.RcodeNameError)
 			goto respond
 		}

@@ -220,7 +220,11 @@ func TestDNSHandlerZeroQuestions(t *testing.T) {
 	r := w.msg
 
 	if want, got := dns.RcodeFormatError, r.Rcode; want != got {
-		t.Errorf("want rcode %s, got %s", dns.RcodeToString[want], dns.RcodeToString[got])
+		t.Errorf(
+			"want rcode %s, got %s",
+			dns.RcodeToString[want],
+			dns.RcodeToString[got],
+		)
 	}
 }
 
@@ -246,7 +250,11 @@ func TestDNSHandlerMultiQuestions(t *testing.T) {
 	r := w.msg
 
 	if want, got := dns.RcodeNotImplemented, r.Rcode; want != got {
-		t.Errorf("want rcode %s, got %s", dns.RcodeToString[want], dns.RcodeToString[got])
+		t.Errorf(
+			"want rcode %s, got %s",
+			dns.RcodeToString[want],
+			dns.RcodeToString[got],
+		)
 	}
 }
 
@@ -262,7 +270,11 @@ func TestDNSHandlerBrokenStore(t *testing.T) {
 	r := w.msg
 
 	if want, got := dns.RcodeServerFailure, r.Rcode; want != got {
-		t.Errorf("want rcode %s, got %s", dns.RcodeToString[want], dns.RcodeToString[got])
+		t.Errorf(
+			"want rcode %s, got %s",
+			dns.RcodeToString[want],
+			dns.RcodeToString[got],
+		)
 	}
 }
 
