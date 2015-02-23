@@ -15,19 +15,19 @@ import (
 )
 
 const (
-	namespace   = "glimpse_agent"
 	consulAgent = "consul agent"
+	namespace   = "glimpse_agent"
 )
 
 var (
-	storeLabels = []string{
+	storeLabels = []string{"error", "operation"}
+	countLabels = []string{
 		"service",
 		"job",
 		"env",
 		"product",
 		"zone",
 		"operation",
-		"error",
 	}
 
 	dnsDurations = prometheus.NewSummaryVec(
@@ -39,15 +39,6 @@ var (
 		},
 		[]string{"protocol", "qtype", "rcode"},
 	)
-	storeDurations = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace: namespace,
-			Subsystem: "consul",
-			Name:      "request_duration_microseconds",
-			Help:      "Consul API request latencies in microseconds.",
-		},
-		[]string{"operation"},
-	)
 	storeCounts = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -55,16 +46,36 @@ var (
 			Name:      "responses",
 			Help:      "Consul API responses.",
 		},
+		countLabels,
+	)
+	storeDurations = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace: namespace,
+			Subsystem: "consul",
+			Name:      "request_duration_microseconds",
+			Help:      "Consul API request latencies in microseconds.",
+		},
+		storeLabels,
+	)
+	storeErrors = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "consul",
+			Name:      "errors",
+			Help:      "Consul API errors",
+		},
 		storeLabels,
 	)
 )
 
 func init() {
 	prometheus.MustRegister(dnsDurations)
-	prometheus.MustRegister(storeDurations)
 	prometheus.MustRegister(storeCounts)
+	prometheus.MustRegister(storeDurations)
+	prometheus.MustRegister(storeErrors)
 	prometheus.MustRegister(
-		prometheus.NewProcessCollectorPIDFn(consulAgentPid, "consul"))
+		prometheus.NewProcessCollectorPIDFn(consulAgentPid, "consul"),
+	)
 }
 
 func dnsMetricsHandler(next dns.Handler) dns.HandlerFunc {
@@ -173,49 +184,37 @@ func newMetricsStore(next store) *metricsStore {
 	return &metricsStore{next: next}
 }
 
-func (s *metricsStore) getInstances(i info) (instances, error) {
+func (s *metricsStore) getInstances(i info) (is instances, err error) {
 	var (
-		op     = "getInstances"
 		labels = prometheus.Labels{
 			"service":   i.service,
 			"job":       i.job,
 			"env":       i.env,
 			"product":   i.product,
 			"zone":      i.zone,
-			"operation": op,
-			"error":     "none",
+			"operation": "getInstances",
 		}
 		start = time.Now()
 	)
 
-	ins, err := s.next.getInstances(i)
-	if err != nil {
-		switch e := err.(type) {
-		case *glimpseError:
-			labels["error"] = errToLabel[e.err]
-		default:
-			labels["error"] = errToLabel[errUntracked]
+	defer trackStore(start, labels["operation"], err)
+	defer func(start time.Time) {
+		if err != nil {
+			storeCounts.With(labels).Set(float64(len(is)))
 		}
-	}
+	}(start)
 
-	duration := float64(time.Since(start)) / float64(time.Microsecond)
-	storeDurations.WithLabelValues(op).Observe(duration)
-	storeCounts.With(labels).Set(float64(len(ins)))
-
-	return ins, err
+	return s.next.getInstances(i)
 }
 
-func (s *metricsStore) getServers(zone string) (instances, error) {
+func (s *metricsStore) getServers(zone string) (is instances, err error) {
 	var (
 		op    = "getServers"
 		start = time.Now()
 	)
+	defer trackStore(start, op, err)
 
-	r, err := s.next.getServers(zone)
-	duration := float64(time.Since(start)) / float64(time.Microsecond)
-	storeDurations.WithLabelValues(op).Observe(duration)
-
-	return r, err
+	return s.next.getServers(zone)
 }
 
 func getConsulStats(info string) (consulStats, error) {
@@ -307,4 +306,27 @@ func consulAgentPid() (int, error) {
 		return 0, fmt.Errorf("could not parse pid of %s: %s", consulAgent, err)
 	}
 	return pid, nil
+}
+
+func trackStore(start time.Time, op string, err error) {
+	var (
+		duration = float64(time.Since(start)) / float64(time.Microsecond)
+		labels   = prometheus.Labels{
+			"error":     "none",
+			"operation": op,
+		}
+	)
+
+	if err != nil {
+		switch e := err.(type) {
+		case *glimpseError:
+			labels["error"] = errToLabel[e.err]
+		default:
+			labels["error"] = errToLabel[errUntracked]
+		}
+
+		storeErrors.With(labels).Inc()
+	}
+
+	storeDurations.With(labels).Observe(duration)
 }
