@@ -42,11 +42,6 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 		q = req.Question[0]
 
 		if !strings.HasSuffix(q.Name, domain) {
-			log.Printf(
-				"[warning] DNS - unknown domain %s (authoritative zone: %s)",
-				q.Name,
-				domain,
-			)
 			res.SetRcode(req, dns.RcodeNameError)
 			goto respond
 		}
@@ -62,7 +57,6 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 		case dns.TypeA, dns.TypeSRV:
 			srv, err = infoFromAddr(addr)
 			if err != nil {
-				log.Printf("[warning] DNS - address parsing failed '%s': %s", q.Name, err)
 				res.SetRcode(req, dns.RcodeNameError)
 				goto respond
 			}
