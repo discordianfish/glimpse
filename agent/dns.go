@@ -46,8 +46,10 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 			goto respond
 		}
 
-		// Trim domain as it is not relevant for the extraction from the
-		// service address.
+		res.Authoritative = true
+		res.RecursionAvailable = false
+
+		// Trim domain as it is not longer relevant for further processing.
 		addr = ""
 		if i := strings.LastIndex(q.Name, "."+domain); i > 0 {
 			addr = q.Name[:i]
@@ -100,9 +102,6 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 			res.SetRcode(req, dns.RcodeNotImplemented)
 			goto respond
 		}
-
-		res.Authoritative = true
-		res.RecursionAvailable = false
 
 	respond:
 		err = w.WriteMsg(res)

@@ -80,6 +80,7 @@ func TestDNSHandler(t *testing.T) {
 		qtype    uint16
 		answers  int
 		rcode    int
+		unknown  bool
 	}{
 		{
 			question: fmt.Sprintf("foo.bar.baz.qux.%s.%s", zone, domain),
@@ -95,16 +96,19 @@ func TestDNSHandler(t *testing.T) {
 			question: "http.api.prod.harpoon.",
 			qtype:    dns.TypeSRV,
 			rcode:    dns.RcodeNameError,
+			unknown:  true,
 		},
 		{
 			question: fmt.Sprintf("http.api.prod.harpoon.%s", zone),
 			qtype:    dns.TypeSRV,
 			rcode:    dns.RcodeNameError,
+			unknown:  true,
 		},
 		{
 			question: fmt.Sprintf("http.api.prod.harpoon.%s.", zone),
 			qtype:    dns.TypeSRV,
 			rcode:    dns.RcodeNameError,
+			unknown:  true,
 		},
 		{
 			question: fmt.Sprintf("http.api.prod.harpoon.%s.%s", zone, domain),
@@ -184,7 +188,7 @@ func TestDNSHandler(t *testing.T) {
 			t.Errorf("want message compression %t, got %t", want, got)
 		}
 
-		if want, got := r.Rcode == dns.RcodeSuccess, r.Authoritative; want != got {
+		if want, got := !test.unknown, r.Authoritative; want != got {
 			t.Errorf("want authoritative %t, got %t", want, got)
 		}
 
