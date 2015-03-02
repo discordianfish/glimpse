@@ -177,7 +177,8 @@ func TestDNSHandler(t *testing.T) {
 		r := w.msg
 
 		if want, got := test.rcode, r.Rcode; want != got {
-			t.Errorf("want rcode %s, got %s for %s", dns.RcodeToString[want], dns.RcodeToString[got], test.question)
+			f := dns.RcodeToString
+			t.Errorf("%s want rcode %s, got %s", test.question, f[want], f[got])
 		}
 
 		if want, got := false, r.RecursionAvailable; want != got {

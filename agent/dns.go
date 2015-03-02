@@ -22,11 +22,8 @@ func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
 			srv       info
 			q         dns.Question
 
-			res = &dns.Msg{}
+			res = newResponse(req)
 		)
-
-		res.SetReply(req)
-		res.Compress = true
 
 		if len(req.Question) == 0 {
 			res.SetRcode(req, dns.RcodeFormatError)
@@ -57,7 +54,6 @@ func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
 		}
 
 		res.Authoritative = true
-		res.RecursionAvailable = false
 
 		// Trim domain as it is not longer relevant for further processing.
 		addr = ""
@@ -112,6 +108,14 @@ func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
 
 		w.WriteMsg(res)
 	}
+}
+
+func newResponse(req *dns.Msg) *dns.Msg {
+	res := &dns.Msg{}
+	res.SetReply(req)
+	res.Compress = true
+	res.RecursionAvailable = false
+	return res
 }
 
 func newRR(q dns.Question, i instance) dns.RR {
