@@ -244,14 +244,7 @@ func TestAgent(t *testing.T) {
 		t.Fatalf("HTTP metrics can't read body: %s", err)
 	}
 
-	for _, metric := range []string{
-		`glimpse_agent_dns_request_duration_microseconds_count`,
-		`glimpse_agent_consul_request_duration_microseconds_count`,
-		`glimpse_agent_consul_responses`,
-		`process_open_fds`,
-		`consul_process_open_fds`,
-		`consul_raft_num_peers`,
-	} {
+	for _, metric := range expectedMetrics {
 		if !strings.Contains(string(body), metric) {
 			t.Errorf("want %s in HTTP body:\n%s", metric, string(body))
 		}
