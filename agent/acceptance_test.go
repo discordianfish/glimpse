@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul/api"
 	"github.com/miekg/dns"
 )
 
@@ -244,14 +245,7 @@ func TestAgent(t *testing.T) {
 		t.Fatalf("HTTP metrics can't read body: %s", err)
 	}
 
-	for _, metric := range []string{
-		`glimpse_agent_dns_request_duration_microseconds_count`,
-		`glimpse_agent_consul_request_duration_microseconds_count`,
-		`glimpse_agent_consul_responses`,
-		`process_open_fds`,
-		`consul_process_open_fds`,
-		`consul_raft_num_peers`,
-	} {
+	for _, metric := range expectedMetrics {
 		if !strings.Contains(string(body), metric) {
 			t.Errorf("want %s in HTTP body:\n%s", metric, string(body))
 		}
@@ -360,17 +354,13 @@ func runAgent() (*cmd, error) {
 		"-srv.zone", srvZone,
 	}
 
-	cmd, err := runCmd("./glimpse-agent", args, "udp listening", 1)
-	if err != nil {
-		return nil, err
-	}
-
-	select {
-	case <-cmd.readyc:
-		return cmd, nil
-	case err := <-cmd.errc:
-		return nil, err
-	}
+	return runCmd("./glimpse-agent", args, func() bool {
+		_, err := query("", dns.TypeNS, "udp")
+		if err != nil {
+			return false
+		}
+		return true
+	})
 }
 
 func runConsul() (*cmd, error) {
@@ -426,33 +416,38 @@ func runConsul() (*cmd, error) {
 		"-data-dir", dataDir,
 	}
 
-	cmd, err := runCmd(consulBin, args, "is now critical", 5)
-	if err != nil {
-		return nil, err
-	}
+	return runCmd(consulBin, args, func() bool {
+		client, err := api.NewClient(&api.Config{
+			Address:    "127.0.0.1:8500",
+			Datacenter: srvZone,
+			HttpClient: (&http.Client{
+				Timeout: 100 * time.Millisecond,
+			}),
+		})
+		if err != nil {
+			panic(err)
+		}
 
-	select {
-	case <-cmd.readyc:
-		return cmd, nil
-	case err := <-cmd.errc:
-		return nil, err
-	}
+		is, _, err := client.Catalog().Service("goku", "", nil)
+		if err != nil || len(is) < 2 {
+			return false
+		}
+
+		return true
+	})
 }
 
 type cmd struct {
-	cmd              *exec.Cmd
-	name             string
-	check            string
-	checkOccurrences int
-	errc             chan error
-	readyc           chan struct{}
-	args             []string
-	stdout           []string
-	stderr           []string
-	terminating      bool
+	cmd        *exec.Cmd
+	name       string
+	errc       chan error
+	args       []string
+	stdout     []string
+	stderr     []string
+	terminatec chan chan error
 }
 
-func runCmd(name string, args []string, check string, occur int) (*cmd, error) {
+func runCmd(name string, args []string, readyFn func() bool) (*cmd, error) {
 	c := exec.Command(name, args...)
 
 	outPipe, err := c.StdoutPipe()
@@ -483,47 +478,34 @@ func runCmd(name string, args []string, check string, occur int) (*cmd, error) {
 	}(c, errc)
 
 	cmd := &cmd{
-		cmd:              c,
-		name:             name,
-		args:             args,
-		check:            check,
-		checkOccurrences: occur,
-		errc:             make(chan error, 1),
-		readyc:           make(chan struct{}),
-		stdout:           []string{},
-		stderr:           []string{},
+		cmd:        c,
+		name:       name,
+		args:       args,
+		stdout:     []string{},
+		stderr:     []string{},
+		errc:       make(chan error, 1),
+		terminatec: make(chan chan error),
 	}
 
-	go cmd.run(stdoutc, stderrc, errc)
+	readyc := make(chan error)
 
-	return cmd, nil
+	go cmd.run(stdoutc, stderrc, errc)
+	go readyCheck(readyc, readyFn)
+
+	return cmd, <-readyc
 }
 
-func (c *cmd) run(stdoutc, stderrc <-chan string, errc <-chan error) {
-	var (
-		count = 0
-		ready = false
-	)
-
+func (c *cmd) run(stdoutc, stderrc <-chan string, errc chan error) {
 	for {
 		select {
 		case line := <-stdoutc:
 			c.stdout = append(c.stdout, line)
-
-			if strings.Contains(line, c.check) {
-				count++
-			}
-			if count == c.checkOccurrences {
-				c.readyc <- struct{}{}
-				ready = true
-			}
 		case line := <-stderrc:
 			c.stderr = append(c.stderr, line)
+		case ec := <-c.terminatec:
+			ec <- syscall.Kill(c.cmd.Process.Pid, syscall.SIGTERM)
+			return
 		case err := <-errc:
-			if c.terminating {
-				return
-			}
-
 			if err != nil {
 				err = fmt.Errorf(
 					"%s failed: %s\nstdout:\n%s\nstderr:\n%s",
@@ -535,31 +517,30 @@ func (c *cmd) run(stdoutc, stderrc <-chan string, errc <-chan error) {
 			}
 			c.errc <- err
 			return
-		case <-time.After(cmdTimeout):
-			if c.terminating {
-				return
-			}
-			if ready {
-				continue
-			}
-			c.errc <- fmt.Errorf(
-				"%s timed out\nstdout:\n%s\nstderr:\n%s",
-				c.name,
-				strings.Join(c.stdout, "\n"),
-				strings.Join(c.stderr, "\n"),
-			)
-			return
 		}
 	}
 }
 
 func (c *cmd) terminate() error {
-	c.terminating = true
-	err := syscall.Kill(c.cmd.Process.Pid, syscall.SIGTERM)
-	if err != nil {
-		return err
+	errc := make(chan error)
+
+	c.terminatec <- errc
+	return <-errc
+}
+
+func readyCheck(readyc chan error, readyFn func() bool) {
+	start := time.Now()
+
+	for !readyFn() {
+		if time.Since(start) > cmdTimeout {
+			readyc <- fmt.Errorf("time out")
+			return
+		}
+
+		time.Sleep(100 * time.Millisecond)
 	}
-	return nil
+
+	close(readyc)
 }
 
 func readLines(pipe io.ReadCloser, outc chan string, errc chan error) {
