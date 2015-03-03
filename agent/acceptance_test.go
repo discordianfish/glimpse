@@ -458,15 +458,15 @@ func runConsul() (*cmd, error) {
 }
 
 type cmd struct {
-	cmd         *exec.Cmd
-	name        string
-	errc        chan error
-	readyc      chan struct{}
-	readyFn     func() bool
-	args        []string
-	stdout      []string
-	stderr      []string
-	terminating bool
+	cmd        *exec.Cmd
+	name       string
+	errc       chan error
+	readyc     chan struct{}
+	readyFn    func() bool
+	args       []string
+	stdout     []string
+	stderr     []string
+	terminatec chan chan error
 }
 
 func runCmd(name string, args []string, readyFn func() bool) (*cmd, error) {
@@ -500,14 +500,15 @@ func runCmd(name string, args []string, readyFn func() bool) (*cmd, error) {
 	}(c, errc)
 
 	cmd := &cmd{
-		cmd:     c,
-		name:    name,
-		args:    args,
-		readyFn: readyFn,
-		errc:    make(chan error, 1),
-		readyc:  make(chan struct{}),
-		stdout:  []string{},
-		stderr:  []string{},
+		cmd:        c,
+		name:       name,
+		args:       args,
+		readyFn:    readyFn,
+		stdout:     []string{},
+		stderr:     []string{},
+		errc:       make(chan error, 1),
+		readyc:     make(chan struct{}),
+		terminatec: make(chan chan error),
 	}
 
 	go cmd.run(stdoutc, stderrc, errc)
@@ -515,29 +516,38 @@ func runCmd(name string, args []string, readyFn func() bool) (*cmd, error) {
 	return cmd, nil
 }
 
-func (c *cmd) run(stdoutc, stderrc <-chan string, errc <-chan error) {
+func (c *cmd) run(stdoutc, stderrc <-chan string, errc chan error) {
 	var (
-		ready = false
+		readyc = make(chan struct{})
 	)
 
 	go func() {
+		start := time.Now()
+
 		for !c.readyFn() {
+			if time.Since(start) > cmdTimeout {
+				errc <- fmt.Errorf("time out")
+				return
+			}
+
 			time.Sleep(100 * time.Millisecond)
 		}
-		c.readyc <- struct{}{}
-		ready = true
+
+		readyc <- struct{}{}
 	}()
+
 	for {
 		select {
+		case <-readyc:
+			c.readyc <- struct{}{}
 		case line := <-stdoutc:
 			c.stdout = append(c.stdout, line)
 		case line := <-stderrc:
 			c.stderr = append(c.stderr, line)
+		case ec := <-c.terminatec:
+			ec <- syscall.Kill(c.cmd.Process.Pid, syscall.SIGTERM)
+			return
 		case err := <-errc:
-			if c.terminating {
-				return
-			}
-
 			if err != nil {
 				err = fmt.Errorf(
 					"%s failed: %s\nstdout:\n%s\nstderr:\n%s",
@@ -549,31 +559,15 @@ func (c *cmd) run(stdoutc, stderrc <-chan string, errc <-chan error) {
 			}
 			c.errc <- err
 			return
-		case <-time.After(cmdTimeout):
-			if c.terminating {
-				return
-			}
-			if ready {
-				continue
-			}
-			c.errc <- fmt.Errorf(
-				"%s timed out\nstdout:\n%s\nstderr:\n%s",
-				c.name,
-				strings.Join(c.stdout, "\n"),
-				strings.Join(c.stderr, "\n"),
-			)
-			return
 		}
 	}
 }
 
 func (c *cmd) terminate() error {
-	c.terminating = true
-	err := syscall.Kill(c.cmd.Process.Pid, syscall.SIGTERM)
-	if err != nil {
-		return err
-	}
-	return nil
+	errc := make(chan error)
+
+	c.terminatec <- errc
+	return <-errc
 }
 
 func readLines(pipe io.ReadCloser, outc chan string, errc chan error) {
