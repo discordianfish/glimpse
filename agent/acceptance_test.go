@@ -354,23 +354,13 @@ func runAgent() (*cmd, error) {
 		"-srv.zone", srvZone,
 	}
 
-	cmd, err := runCmd("./glimpse-agent", args, func() bool {
+	return runCmd("./glimpse-agent", args, func() bool {
 		_, err := query("", dns.TypeNS, "udp")
 		if err != nil {
 			return false
 		}
 		return true
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	select {
-	case <-cmd.readyc:
-		return cmd, nil
-	case err := <-cmd.errc:
-		return nil, err
-	}
 }
 
 func runConsul() (*cmd, error) {
@@ -426,7 +416,7 @@ func runConsul() (*cmd, error) {
 		"-data-dir", dataDir,
 	}
 
-	cmd, err := runCmd(consulBin, args, func() bool {
+	return runCmd(consulBin, args, func() bool {
 		client, err := api.NewClient(&api.Config{
 			Address:    "127.0.0.1:8500",
 			Datacenter: srvZone,
@@ -445,24 +435,12 @@ func runConsul() (*cmd, error) {
 
 		return true
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	select {
-	case <-cmd.readyc:
-		return cmd, nil
-	case err := <-cmd.errc:
-		return nil, err
-	}
 }
 
 type cmd struct {
 	cmd        *exec.Cmd
 	name       string
 	errc       chan error
-	readyc     chan struct{}
-	readyFn    func() bool
 	args       []string
 	stdout     []string
 	stderr     []string
@@ -503,43 +481,23 @@ func runCmd(name string, args []string, readyFn func() bool) (*cmd, error) {
 		cmd:        c,
 		name:       name,
 		args:       args,
-		readyFn:    readyFn,
 		stdout:     []string{},
 		stderr:     []string{},
 		errc:       make(chan error, 1),
-		readyc:     make(chan struct{}),
 		terminatec: make(chan chan error),
 	}
 
-	go cmd.run(stdoutc, stderrc, errc)
+	readyc := make(chan error)
 
-	return cmd, nil
+	go cmd.run(stdoutc, stderrc, errc)
+	go readyCheck(readyc, readyFn)
+
+	return cmd, <-readyc
 }
 
 func (c *cmd) run(stdoutc, stderrc <-chan string, errc chan error) {
-	var (
-		readyc = make(chan struct{})
-	)
-
-	go func() {
-		start := time.Now()
-
-		for !c.readyFn() {
-			if time.Since(start) > cmdTimeout {
-				errc <- fmt.Errorf("time out")
-				return
-			}
-
-			time.Sleep(100 * time.Millisecond)
-		}
-
-		readyc <- struct{}{}
-	}()
-
 	for {
 		select {
-		case <-readyc:
-			c.readyc <- struct{}{}
 		case line := <-stdoutc:
 			c.stdout = append(c.stdout, line)
 		case line := <-stderrc:
@@ -568,6 +526,21 @@ func (c *cmd) terminate() error {
 
 	c.terminatec <- errc
 	return <-errc
+}
+
+func readyCheck(readyc chan error, readyFn func() bool) {
+	start := time.Now()
+
+	for !readyFn() {
+		if time.Since(start) > cmdTimeout {
+			readyc <- fmt.Errorf("time out")
+			return
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	close(readyc)
 }
 
 func readLines(pipe io.ReadCloser, outc chan string, errc chan error) {
