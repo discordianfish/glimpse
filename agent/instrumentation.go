@@ -193,12 +193,13 @@ func (s *metricsStore) getInstances(i info) (is instances, err error) {
 		start = time.Now()
 	)
 
-	defer trackStore(start, labels["operation"], err)
-	defer func(start time.Time) {
+	defer func() {
 		if err != nil {
 			storeCounts.With(labels).Set(float64(len(is)))
 		}
-	}(start)
+
+		trackStore(start, labels["operation"], err)
+	}()
 
 	return s.next.getInstances(i)
 }
@@ -208,7 +209,9 @@ func (s *metricsStore) getServers(zone string) (is instances, err error) {
 		op    = "getServers"
 		start = time.Now()
 	)
-	defer trackStore(start, op, err)
+	defer func() {
+		trackStore(start, op, err)
+	}()
 
 	return s.next.getServers(zone)
 }
