@@ -320,4 +320,16 @@ func TestProtocolHandler(t *testing.T) {
 	if got := len(w.msg.Answer); want != got {
 		t.Errorf("want %d answers, got %d", want, got)
 	}
+
+	e := &errorWriter{w}
+	errorHandler := dns.HandlerFunc(func(w dns.ResponseWriter, req *dns.Msg) {
+		err := w.WriteMsg(&dns.Msg{})
+		if err == nil {
+			t.Fatalf("want WriteMsg() to fail with errorWriter")
+		}
+	})
+
+	m = &dns.Msg{}
+	m.SetQuestion(dns.Fqdn("app.glimpse.io"), dns.TypeA)
+	protocolHandler(42, errorHandler).ServeDNS(e, m)
 }

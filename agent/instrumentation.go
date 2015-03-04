@@ -85,7 +85,7 @@ func dnsMetricsHandler(next dns.Handler) dns.HandlerFunc {
 			qtype = "unknown"
 			rcode = "unknown"
 
-			buffer = &bufferedWriter{w, nil}
+			buffer = &cachingWriter{ResponseWriter: w}
 			start  = time.Now()
 		)
 
@@ -100,15 +100,24 @@ func dnsMetricsHandler(next dns.Handler) dns.HandlerFunc {
 		}
 
 		next.ServeDNS(buffer, req)
-
-		if buffer.msg != nil {
-			w.WriteMsg(buffer.msg)
-			rcode = dns.RcodeToString[buffer.msg.Rcode]
+		if buffer.last != nil {
+			rcode = dns.RcodeToString[buffer.last.Rcode]
 		}
 
 		duration := float64(time.Since(start)) / float64(time.Microsecond)
 		dnsDurations.WithLabelValues(prot, qtype, rcode).Observe(duration)
 	}
+}
+
+type cachingWriter struct {
+	dns.ResponseWriter
+
+	last *dns.Msg
+}
+
+func (w *cachingWriter) WriteMsg(m *dns.Msg) error {
+	w.last = m
+	return w.ResponseWriter.WriteMsg(m)
 }
 
 // consulCollector implements the prometheus.Collector interface.

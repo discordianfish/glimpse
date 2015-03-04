@@ -163,30 +163,22 @@ func newRR(q dns.Question, i instance) dns.RR {
 // TODO(alx): Settle on naming for handlers acting as middleware.
 func protocolHandler(maxAnswers int, next dns.Handler) dns.Handler {
 	return dns.HandlerFunc(func(w dns.ResponseWriter, r *dns.Msg) {
-		var (
-			buf      = &bufferedWriter{w, nil}
-			_, isUDP = w.RemoteAddr().(*net.UDPAddr)
-		)
-
-		next.ServeDNS(buf, r)
-
-		if isUDP && len(buf.msg.Answer) > maxAnswers {
-			buf.msg.Answer = buf.msg.Answer[:maxAnswers]
-			buf.msg.Truncated = true
-		}
-
-		w.WriteMsg(buf.msg)
+		next.ServeDNS(&truncatingWriter{w, maxAnswers}, r)
 	})
 }
 
-type bufferedWriter struct {
+type truncatingWriter struct {
 	dns.ResponseWriter
-
-	msg *dns.Msg
+	maxAnswers int
 }
 
-func (w *bufferedWriter) WriteMsg(m *dns.Msg) error {
-	w.msg = m
+func (w *truncatingWriter) WriteMsg(m *dns.Msg) error {
+	_, isUDP := w.RemoteAddr().(*net.UDPAddr)
 
-	return nil
+	if isUDP && len(m.Answer) > w.maxAnswers {
+		m.Answer = m.Answer[:w.maxAnswers]
+		m.Truncated = true
+	}
+
+	return w.ResponseWriter.WriteMsg(m)
 }

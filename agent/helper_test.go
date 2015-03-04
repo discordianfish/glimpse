@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -70,6 +71,15 @@ func (w *testWriter) Close() error                { return nil }
 func (w *testWriter) TsigStatus() error           { return nil }
 func (w *testWriter) TsigTimersOnly(b bool)       {}
 func (w *testWriter) Hijack()                     {}
+
+// errorWriter implements the dns.ResponseWriter interface.
+type errorWriter struct {
+	*testWriter
+}
+
+func (e *errorWriter) WriteMsg(m *dns.Msg) error {
+	return errors.New("failed write")
+}
 
 // helpers
 func fqdn(s ...string) string {
