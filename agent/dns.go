@@ -61,6 +61,12 @@ func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
 			addr = q.Name[:i]
 		}
 
+		if !validDomain(addr) {
+			res.SetRcode(req, dns.RcodeNameError)
+			w.WriteMsg(res)
+			return
+		}
+
 		switch q.Qtype {
 		case dns.TypeA, dns.TypeSRV:
 			srv, err = infoFromAddr(addr)
@@ -148,6 +154,19 @@ func newRR(q dns.Question, i instance) dns.RR {
 	default:
 		panic("unreachable")
 	}
+}
+
+func validDomain(q string) bool {
+	if q == "" {
+		return true
+	}
+	fields := strings.Split(q, ".")
+	if len(fields) == 1 || len(fields) == 5 {
+		if err := validateZone(fields[len(fields)-1]); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 // TODO(alx): Settle on naming for handlers acting as middleware.

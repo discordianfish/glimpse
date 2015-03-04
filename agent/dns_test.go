@@ -155,6 +155,11 @@ func TestDNSHandler(t *testing.T) {
 			rcode:    dns.RcodeNameError,
 		},
 		{
+			question: fmt.Sprintf("foo.%s.%s", zone, domain),
+			qtype:    dns.TypeAAAA,
+			rcode:    dns.RcodeNameError,
+		},
+		{
 			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
 			qtype:    dns.TypeAAAA,
 			rcode:    dns.RcodeNotImplemented,
