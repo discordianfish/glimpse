@@ -97,7 +97,7 @@ func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
 			}
 
 			instances, err = store.getServers(addr)
-			if err != nil {
+			if err != nil && !isNoInstances(err) {
 				log.Printf("[error] store - lookup failed '%s': %s", q.Name, err)
 				res.SetRcode(req, dns.RcodeServerFailure)
 				goto respond

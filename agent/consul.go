@@ -79,22 +79,23 @@ func (s *consulStore) getInstances(info info) (instances, error) {
 	return is, nil
 }
 
-func (s *consulStore) getServers(zone string) (instances, error) {
+func (s *consulStore) getServers(zone string) (is instances, err error) {
 	members, err := s.client.Agent().Members(true)
 	if err != nil {
 		return nil, newError(errConsulAPI, "%s", err)
 	}
-	srvs := instances{}
+
 	for _, m := range members {
 		if zone == "" || strings.HasSuffix(m.Name, "."+zone) {
 			n := m.Name
 			if i := strings.LastIndex(n, "."); i > 0 {
 				n = n[:i]
 			}
-			srvs = append(srvs, instance{ip: net.ParseIP(m.Addr), host: n})
+			is = append(is, instance{ip: net.ParseIP(m.Addr), host: n})
 		}
 	}
-	return srvs, nil
+
+	return is, nil
 }
 
 func filterEntries(entries []*api.ServiceEntry) []*api.ServiceEntry {
