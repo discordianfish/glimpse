@@ -30,6 +30,7 @@ var (
 	version = "0.0.0.dev"
 
 	rDNSZone = regexp.MustCompile(`^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6}\.?$`)
+	logger   = log.New(os.Stdout, "glimpse-agent ", log.Lmicroseconds)
 )
 
 func main() {
@@ -50,10 +51,6 @@ func main() {
 	flag.Var(&dnsZones, "dns.zone", "DNS zone")
 	flag.Parse()
 
-	log.SetFlags(log.Lmicroseconds)
-	log.SetOutput(os.Stdout)
-	log.SetPrefix("glimpse-agent ")
-
 	if len(dnsZones) == 0 {
 		dnsZones = append(dnsZones, defaultDNSZone)
 	}
@@ -64,12 +61,19 @@ func main() {
 		Datacenter: *srvZone,
 	})
 	if err != nil {
-		log.Fatalf("consul connection failed: %s", err)
+		logger.Fatalf("consul connection failed: %s", err)
 	}
 
 	var (
 		errc  = make(chan error, 1)
-		store = newMetricsStore(newConsulStore(client))
+		store = newLoggingStore(
+			logger,
+			newMetricsStore(
+				newConsulStore(
+					client,
+				),
+			),
+		)
 	)
 
 	http.Handle("/metrics", prometheus.Handler())
@@ -104,7 +108,7 @@ func main() {
 
 	// HTTP server
 	go func(addr string, errc chan<- error) {
-		log.Printf("[info] HTTP listening on %s\n", addr)
+		logger.Printf("[info] HTTP listening on %s\n", addr)
 		errc <- fmt.Errorf(
 			"[error] HTTP - server failed: %s",
 			http.ListenAndServe(addr, nil),
@@ -118,7 +122,7 @@ func main() {
 		go registerConsulCollector(*consulInfo)
 	}
 
-	log.Fatalln(<-errc)
+	logger.Fatalln(<-errc)
 }
 
 func interrupt() error {
@@ -128,7 +132,7 @@ func interrupt() error {
 }
 
 func runDNSServer(server *dns.Server, errc chan error) {
-	log.Printf("[info] DNS/%s listening on %s\n", server.Net, server.Addr)
+	logger.Printf("[info] DNS/%s listening on %s\n", server.Net, server.Addr)
 	errc <- fmt.Errorf(
 		"[error] DNS/%s - server failed: %s", server.Net,
 		server.ListenAndServe(),
@@ -140,7 +144,7 @@ func registerConsulCollector(consulInfo string) {
 
 	for {
 		if err := prometheus.Register(c); err != nil {
-			log.Printf(
+			logger.Printf(
 				"[error] prometheus - could not register collector (-consul.info=%s)",
 				consulInfo,
 			)
