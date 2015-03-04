@@ -81,6 +81,7 @@ func TestDNSHandler(t *testing.T) {
 		answers  int
 		rcode    int
 		unknown  bool
+		soaCache uint32
 	}{
 		{
 			question: fmt.Sprintf("foo.bar.baz.qux.%s.%s", zone, domain),
@@ -91,6 +92,7 @@ func TestDNSHandler(t *testing.T) {
 			question: fmt.Sprintf("foo.bar.baz.qux.%s.%s", "invalid", domain),
 			qtype:    dns.TypeSRV,
 			rcode:    dns.RcodeNameError,
+			soaCache: defaultInvalidTTL,
 		},
 		{
 			question: "http.api.prod.harpoon.",
@@ -153,11 +155,13 @@ func TestDNSHandler(t *testing.T) {
 			question: fmt.Sprintf("foo.%s.%s", zone, domain),
 			qtype:    dns.TypeNS,
 			rcode:    dns.RcodeNameError,
+			soaCache: defaultInvalidTTL,
 		},
 		{
 			question: fmt.Sprintf("foo.%s.%s", zone, domain),
 			qtype:    dns.TypeAAAA,
 			rcode:    dns.RcodeNameError,
+			soaCache: defaultInvalidTTL,
 		},
 		{
 			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
@@ -214,6 +218,25 @@ func TestDNSHandler(t *testing.T) {
 				if !ok {
 					t.Error("want SRV resource record, got something else")
 				}
+			}
+		}
+
+		if test.soaCache != 0 {
+			if want, got := 1, len(r.Extra); want != got {
+				t.Fatalf("%s want %d extras, got %d", test.question, want, got)
+			}
+
+			soa, ok := r.Extra[0].(*dns.SOA)
+			if !ok {
+				t.Fatalf("%s want SOA resource record", test.question)
+			}
+
+			if want, got := test.soaCache, soa.Hdr.Ttl; want != got {
+				t.Errorf("%s want SOA Minimum %d, got %d", test.question, want, got)
+			}
+		} else {
+			if want, got := 0, len(r.Extra); want != got {
+				t.Errorf("%s want %d extras, got %d", test.question, want, got)
 			}
 		}
 	}
