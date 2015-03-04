@@ -80,7 +80,7 @@ func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
 					goto respond
 				}
 
-				log.Printf("[error] store - lookup failed '%s': %s", q.Name, err)
+				log.Printf("store - lookup failed '%s': %s", q.Name, err)
 				res.SetRcode(req, dns.RcodeServerFailure)
 				goto respond
 			}
@@ -98,7 +98,7 @@ func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
 
 			instances, err = store.getServers(addr)
 			if err != nil && !isNoInstances(err) {
-				log.Printf("[error] store - lookup failed '%s': %s", q.Name, err)
+				log.Printf("store - lookup failed '%s': %s", q.Name, err)
 				res.SetRcode(req, dns.RcodeServerFailure)
 				goto respond
 			}
@@ -114,7 +114,7 @@ func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
 	respond:
 		err = w.WriteMsg(res)
 		if err != nil {
-			log.Printf("[error] DNS - write msg failed: %s", err)
+			log.Printf("DNS - write msg failed: %s", err)
 		}
 
 		reqInfo := dns.TypeToString[q.Qtype] + " " + q.Name
@@ -123,7 +123,7 @@ func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
 		}
 		// TODO(alx): Put logging in central place for control in different
 		//            environemnts.
-		log.Printf("[info] DNS - request: %s response: %s (%d rrs)",
+		log.Printf("DNS - request: %s response: %s (%d rrs)",
 			reqInfo, dns.RcodeToString[res.Rcode], len(res.Answer))
 	}
 }
