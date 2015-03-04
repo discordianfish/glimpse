@@ -108,8 +108,6 @@ func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
 			for _, i := range instances {
 				res.Answer = append(res.Answer, newRR(q, i))
 			}
-		default:
-			res.SetRcode(req, dns.RcodeNotImplemented)
 		}
 
 		w.WriteMsg(res)

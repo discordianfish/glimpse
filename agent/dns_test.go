@@ -162,17 +162,17 @@ func TestDNSHandler(t *testing.T) {
 		{
 			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
 			qtype:    dns.TypeAAAA,
-			rcode:    dns.RcodeNotImplemented,
+			rcode:    dns.RcodeSuccess,
 		},
 		{
 			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
 			qtype:    dns.TypeMX,
-			rcode:    dns.RcodeNotImplemented,
+			rcode:    dns.RcodeSuccess,
 		},
 		{
 			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
 			qtype:    dns.TypeTXT,
-			rcode:    dns.RcodeNotImplemented,
+			rcode:    dns.RcodeSuccess,
 		},
 	} {
 		m := &dns.Msg{}
