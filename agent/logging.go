@@ -93,7 +93,7 @@ func (s *loggingStore) log(took time.Duration, op string, err error, input strin
 	label := errToLabel[errUntracked]
 
 	switch e := err.(type) {
-	case *glimpseError:
+	case glimpseError:
 		label = errToLabel[e.err]
 	}
 

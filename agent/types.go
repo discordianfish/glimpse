@@ -114,14 +114,14 @@ type glimpseError struct {
 	msg string
 }
 
-func newError(err error, format string, args ...interface{}) *glimpseError {
-	return &glimpseError{
+func newError(err error, format string, args ...interface{}) glimpseError {
+	return glimpseError{
 		err: err,
 		msg: fmt.Sprintf(format, args...),
 	}
 }
 
-func (e *glimpseError) Error() string {
+func (e glimpseError) Error() string {
 	return fmt.Sprintf("%s: %s", e.err, e.msg)
 }
 
@@ -139,7 +139,7 @@ func isNoInstances(err error) bool {
 
 func unwrapError(err error) error {
 	switch e := err.(type) {
-	case *glimpseError:
+	case glimpseError:
 		return e.err
 	}
 
