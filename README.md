@@ -96,14 +96,15 @@ infrastructure through the server ring.
 To service requests, unbound remains the main entry point for all DNS
 interaction. It runs with a configured stub zone pointing to the local
 glimpse-agent, which will answer all SRV and A queries by talking to the
-consul-agent HTTP API. Requests flow through components on a single host, and
-generally escaping the host to reach the zone-local server ring.
+consul-agent HTTP API. Requests flow through components on a single host.
+The local unbound may serve a cache hit; otherwise, requests escape the 
+host to reach the zone-local server ring.
 
-![Request flow](http://i.imgur.com/lHBZQQj.png)
+![Request flow](http://i.imgur.com/Cxmj6Ve.png)
 
 Responses follow the same path back to the client.
 
-![Response flow](http://i.imgur.com/NTVFPUP.png)
+![Response flow](http://i.imgur.com/5WpNnZx.png)
 
 ## Future Host Interactions
 
