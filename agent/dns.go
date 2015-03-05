@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net"
 	"strings"
 	"time"
@@ -31,13 +30,15 @@ func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
 
 		if len(req.Question) == 0 {
 			res.SetRcode(req, dns.RcodeFormatError)
-			goto respond
+			w.WriteMsg(res)
+			return
 		}
 
 		// http://maradns.samiam.org/multiple.qdcount.html
 		if len(req.Question) > 1 {
 			res.SetRcode(req, dns.RcodeNotImplemented)
-			goto respond
+			w.WriteMsg(res)
+			return
 		}
 
 		q = req.Question[0]
@@ -51,7 +52,8 @@ func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
 
 		if domain == "" {
 			res.SetRcode(req, dns.RcodeNameError)
-			goto respond
+			w.WriteMsg(res)
+			return
 		}
 
 		res.Authoritative = true
@@ -68,7 +70,7 @@ func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
 			srv, err = infoFromAddr(addr)
 			if err != nil {
 				res.SetRcode(req, dns.RcodeNameError)
-				goto respond
+				break
 			}
 
 			instances, err = store.getInstances(srv)
@@ -77,12 +79,11 @@ func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
 				//           instances.
 				if isNoInstances(err) {
 					res.SetRcode(req, dns.RcodeNameError)
-					goto respond
+					break
 				}
 
-				log.Printf("[error] store - lookup failed '%s': %s", q.Name, err)
 				res.SetRcode(req, dns.RcodeServerFailure)
-				goto respond
+				break
 			}
 
 			for _, i := range instances {
@@ -92,15 +93,14 @@ func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
 			if addr != "" {
 				if err := validateZone(addr); err != nil {
 					res.SetRcode(req, dns.RcodeNameError)
-					goto respond
+					break
 				}
 			}
 
 			instances, err = store.getServers(addr)
-			if err != nil {
-				log.Printf("[error] store - lookup failed '%s': %s", q.Name, err)
+			if err != nil && !isNoInstances(err) {
 				res.SetRcode(req, dns.RcodeServerFailure)
-				goto respond
+				break
 			}
 
 			for _, i := range instances {
@@ -108,23 +108,9 @@ func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
 			}
 		default:
 			res.SetRcode(req, dns.RcodeNotImplemented)
-			goto respond
 		}
 
-	respond:
-		err = w.WriteMsg(res)
-		if err != nil {
-			log.Printf("[error] DNS - write msg failed: %s", err)
-		}
-
-		reqInfo := dns.TypeToString[q.Qtype] + " " + q.Name
-		if q.Qtype == dns.TypeNone {
-			reqInfo = "<empty>"
-		}
-		// TODO(alx): Put logging in central place for control in different
-		//            environemnts.
-		log.Printf("[info] DNS - request: %s response: %s (%d rrs)",
-			reqInfo, dns.RcodeToString[res.Rcode], len(res.Answer))
+		w.WriteMsg(res)
 	}
 }
 

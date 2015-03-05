@@ -11,7 +11,7 @@ import (
 var (
 	errConsulAPI   = errors.New("Consul API failed")
 	errInvalidIP   = errors.New("invalid IP address")
-	errNoInstances = errors.New("no instances found")
+	errNoInstances = errors.New("no instances")
 	errUntracked   = errors.New("untracked error")
 
 	errToLabel = map[error]string{

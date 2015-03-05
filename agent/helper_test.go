@@ -41,16 +41,23 @@ func (s *testStore) getInstances(srv info) (instances, error) {
 	return r, nil
 }
 
-func (s *testStore) getServers(zone string) (instances, error) {
-	if zone != "" {
-		return s.servers[zone], nil
+func (s *testStore) getServers(zone string) (is instances, err error) {
+	for _, s := range s.servers[zone] {
+		is = append(is, s)
 	}
 
-	r := instances{}
-	for _, s := range s.servers {
-		r = append(r, s...)
+	// Return all servers if zone is empty.
+	if zone == "" {
+		for _, srvs := range s.servers {
+			is = append(is, srvs...)
+		}
 	}
-	return r, nil
+
+	if len(is) == 0 {
+		return nil, newError(errNoInstances, "found for %s", zone)
+	}
+
+	return is, nil
 }
 
 // testWriter implements the dns.ResponseWriter interface.
