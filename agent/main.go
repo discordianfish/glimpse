@@ -81,13 +81,16 @@ func main() {
 	dnsMux := dns.NewServeMux()
 	dnsMux.Handle(
 		".",
-		dnsMetricsHandler(
-			protocolHandler(
-				*maxAnswers,
-				dnsHandler(
-					store,
-					*srvZone,
-					dnsZones,
+		dnsLoggingHandler(
+			logger,
+			dnsMetricsHandler(
+				protocolHandler(
+					*maxAnswers,
+					dnsHandler(
+						store,
+						*srvZone,
+						dnsZones,
+					),
 				),
 			),
 		),

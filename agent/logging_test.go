@@ -3,9 +3,103 @@ package main
 import (
 	"bytes"
 	"log"
+	"net"
 	"strings"
 	"testing"
+
+	"github.com/miekg/dns"
 )
+
+func TestDNSLoggingHandler(t *testing.T) {
+	var (
+		b    = &bytes.Buffer{}
+		l    = log.New(b, "glimpse-agent ", log.Lmicroseconds)
+		fqdn = dns.Fqdn("db.glimpse.io")
+		w    = &testWriter{
+			remoteAddr: &net.UDPAddr{
+				IP:   net.ParseIP("8.7.6.5"),
+				Port: 4321,
+			},
+		}
+		testHandler = dns.HandlerFunc(func(w dns.ResponseWriter, req *dns.Msg) {
+			res := &dns.Msg{}
+			res.SetReply(req)
+			res.SetRcode(req, dns.RcodeNotImplemented)
+
+			err := w.WriteMsg(res)
+			if err != nil {
+				t.Fatalf("write response failed: %s", err)
+			}
+		})
+	)
+
+	m := &dns.Msg{}
+	m.SetQuestion(fqdn, dns.TypeA)
+
+	dnsLoggingHandler(l, testHandler).ServeDNS(w, m)
+
+	sp := strings.SplitN(strings.Trim(b.String(), "\n"), " ", 10)
+
+	if want, have := 10, len(sp); want != have {
+		t.Fatalf("want %d fields, got %d fields", want, have)
+	}
+
+	if want, have := "DNS", sp[2]; want != have {
+		t.Errorf("want %s, have %s", want, have)
+	}
+
+	if want, have := "8.7.6.5:4321", sp[4]; want != have {
+		t.Errorf("want %s, have %s", want, have)
+	}
+
+	if want, have := "A", sp[5]; want != have {
+		t.Errorf("want %s, have %s", want, have)
+	}
+
+	if want, have := fqdn, sp[6]; want != have {
+		t.Errorf("want %s, have %s", want, have)
+	}
+
+	if want, have := dns.RcodeToString[dns.RcodeNotImplemented], sp[7]; want != have {
+		t.Errorf("want %s, have %s", want, have)
+	}
+
+	if want, have := "0", sp[8]; want != have {
+		t.Errorf("want %s, have %s", want, have)
+	}
+
+	if want, have := "''", sp[9]; want != have {
+		t.Errorf("want %#v, have %#v", want, have)
+	}
+}
+
+func TestDNSLoggingHandlerError(t *testing.T) {
+	var (
+		b = &bytes.Buffer{}
+		l = log.New(b, "glimpse-agent ", log.Lmicroseconds)
+		m = &dns.Msg{}
+		e = &errorWriter{
+			&testWriter{
+				remoteAddr: &net.UDPAddr{},
+			},
+		}
+		errorHandler = dns.HandlerFunc(func(w dns.ResponseWriter, req *dns.Msg) {
+			err := w.WriteMsg(&dns.Msg{})
+			if err == nil {
+				t.Fatalf("want WriteMsg() to fail with errorWriter")
+			}
+		})
+	)
+
+	m.SetQuestion(dns.Fqdn("app.glimpse.io"), dns.TypeA)
+	dnsLoggingHandler(l, errorHandler).ServeDNS(e, m)
+
+	sp := strings.SplitN(strings.Trim(b.String(), "\n"), " ", 10)
+
+	if want, have := "'failed write'", sp[9]; want != have {
+		t.Errorf("want %#v, have %#v", want, have)
+	}
+}
 
 func TestLoggingStoreError(t *testing.T) {
 	var (
