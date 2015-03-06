@@ -14,7 +14,7 @@ var (
 	errNoInstances = errors.New("no instances")
 	errUntracked   = errors.New("untracked error")
 
-	errToLabel = map[error]string{
+	errLabels = map[error]string{
 		errConsulAPI:   "consulapi",
 		errInvalidIP:   "invalidip",
 		errNoInstances: "noinstances",
@@ -144,4 +144,13 @@ func unwrapError(err error) error {
 	}
 
 	return err
+}
+
+func errToLabel(err error) string {
+	switch e := err.(type) {
+	case glimpseError:
+		return errLabels[e.err]
+	default:
+		return errLabels[errUntracked]
+	}
 }

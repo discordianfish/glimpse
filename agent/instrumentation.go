@@ -326,12 +326,7 @@ func trackStore(start time.Time, op string, err error) {
 	)
 
 	if err != nil {
-		switch e := err.(type) {
-		case *glimpseError:
-			labels["error"] = errToLabel[e.err]
-		default:
-			labels["error"] = errToLabel[errUntracked]
-		}
+		labels["error"] = errToLabel(err)
 
 		storeErrors.With(labels).Inc()
 	}

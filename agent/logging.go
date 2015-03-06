@@ -90,12 +90,5 @@ func (s *loggingStore) log(took time.Duration, op string, err error, input strin
 		return
 	}
 
-	label := errToLabel[errUntracked]
-
-	switch e := err.(type) {
-	case glimpseError:
-		label = errToLabel[e.err]
-	}
-
-	s.logger.Printf("STORE %d %s %s %s", took, op, label, input)
+	s.logger.Printf("STORE %d %s %s %s", took, op, errToLabel(err), input)
 }

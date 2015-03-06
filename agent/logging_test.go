@@ -151,7 +151,7 @@ func TestLoggingStoreError(t *testing.T) {
 		t.Errorf("want %s, have %s", want, have)
 	}
 
-	if want, have := errToLabel[errNoInstances], sp[5]; want != have {
+	if want, have := errLabels[errNoInstances], sp[5]; want != have {
 		t.Errorf("want %s, have %s", want, have)
 	}
 
@@ -176,7 +176,7 @@ func TestLoggingStoreError(t *testing.T) {
 		t.Errorf("want %s, have %s", want, have)
 	}
 
-	if want, have := errToLabel[errNoInstances], sp[5]; want != have {
+	if want, have := errLabels[errNoInstances], sp[5]; want != have {
 		t.Errorf("want %s, have %s", want, have)
 	}
 
