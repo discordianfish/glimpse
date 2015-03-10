@@ -27,8 +27,8 @@ type loggingWriter struct {
 func (w *loggingWriter) WriteMsg(res *dns.Msg) error {
 	var (
 		errField = ""
-		reqType  = "empty"
-		reqName  = "empty"
+		qType    = "empty"
+		qName    = "empty"
 	)
 
 	err := w.ResponseWriter.WriteMsg(res)
@@ -39,16 +39,16 @@ func (w *loggingWriter) WriteMsg(res *dns.Msg) error {
 	if len(res.Question) > 0 && res.Question[0].Qtype != dns.TypeNone {
 		q := res.Question[0]
 
-		reqType = dns.TypeToString[q.Qtype]
-		reqName = q.Name
+		qType = dns.TypeToString[q.Qtype]
+		qName = q.Name
 	}
 
 	w.logger.Printf(
 		"DNS %d %s %s %s %s %d '%s'",
 		time.Since(w.start),
 		w.RemoteAddr().String(),
-		reqType,
-		reqName,
+		qType,
+		qName,
 		dns.RcodeToString[res.Rcode],
 		len(res.Answer),
 		errField,
