@@ -138,6 +138,12 @@ func TestAgent(t *testing.T) {
 			net:   "udp",
 			rcode: dns.RcodeNameError,
 		},
+		{
+			query: fqdn(testCase0.srvAddr, "ff", dnsZone),
+			qtype: dns.TypeA,
+			net:   "tcp",
+			rcode: dns.RcodeNameError,
+		},
 	}
 
 	consul, err := runConsul()
