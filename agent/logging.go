@@ -44,8 +44,8 @@ func (w *loggingWriter) WriteMsg(res *dns.Msg) error {
 	}
 
 	w.logger.Printf(
-		"DNS %d %s %s %s %s %d '%s'",
-		time.Since(w.start),
+		"DNS %dms %s %s %s %s %d '%s'",
+		time.Since(w.start)/time.Millisecond,
 		w.RemoteAddr().String(),
 		qType,
 		qName,
@@ -90,5 +90,5 @@ func (s *loggingStore) log(took time.Duration, op string, err error, input strin
 		return
 	}
 
-	s.logger.Printf("STORE %d %s %s %s", took, op, errToLabel(err), input)
+	s.logger.Printf("STORE %dms %s %s %s", took/time.Millisecond, op, errToLabel(err), input)
 }
