@@ -33,7 +33,7 @@ func (w *loggingWriter) WriteMsg(res *dns.Msg) error {
 
 	err := w.ResponseWriter.WriteMsg(res)
 	if err != nil {
-		errField = err.Error()
+		errField = " error: " + err.Error()
 	}
 
 	if len(res.Question) > 0 && res.Question[0].Qtype != dns.TypeNone {
@@ -44,7 +44,7 @@ func (w *loggingWriter) WriteMsg(res *dns.Msg) error {
 	}
 
 	w.logger.Printf(
-		"DNS %dms %s %s %s %s %d '%s'",
+		"DNS %dms %s %s %s %s %d%s",
 		time.Since(w.start)/time.Millisecond,
 		w.RemoteAddr().String(),
 		qType,
@@ -71,7 +71,7 @@ func newLoggingStore(logger *log.Logger, next store) store {
 
 func (s *loggingStore) getInstances(i info) (is instances, err error) {
 	defer func(start time.Time) {
-		s.log(time.Since(start), "getInstances", err, i.addr())
+		s.log(time.Since(start), "getInstances", i.addr(), err)
 	}(time.Now())
 
 	return s.next.getInstances(i)
@@ -79,16 +79,16 @@ func (s *loggingStore) getInstances(i info) (is instances, err error) {
 
 func (s *loggingStore) getServers(zone string) (is instances, err error) {
 	defer func(start time.Time) {
-		s.log(time.Since(start), "getServers", err, zone)
+		s.log(time.Since(start), "getServers", zone, err)
 	}(time.Now())
 
 	return s.next.getServers(zone)
 }
 
-func (s *loggingStore) log(took time.Duration, op string, err error, input string) {
+func (s *loggingStore) log(took time.Duration, op, input string, err error) {
 	if err == nil {
 		return
 	}
 
-	s.logger.Printf("STORE %dms %s %s %s", took/time.Millisecond, op, errToLabel(err), input)
+	s.logger.Printf("STORE %dms %s %s error: %s", took/time.Millisecond, op, input, err)
 }

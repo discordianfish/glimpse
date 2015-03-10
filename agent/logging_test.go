@@ -40,7 +40,7 @@ func TestDNSLoggingHandler(t *testing.T) {
 
 	sp := strings.SplitN(strings.Trim(b.String(), "\n"), " ", 10)
 
-	if want, have := 10, len(sp); want != have {
+	if want, have := 9, len(sp); want != have {
 		t.Fatalf("want %d fields, got %d fields", want, have)
 	}
 
@@ -67,10 +67,6 @@ func TestDNSLoggingHandler(t *testing.T) {
 	if want, have := "0", sp[8]; want != have {
 		t.Errorf("want %s, have %s", want, have)
 	}
-
-	if want, have := "''", sp[9]; want != have {
-		t.Errorf("want %#v, have %#v", want, have)
-	}
 }
 
 func TestDNSLoggingHandlerError(t *testing.T) {
@@ -96,7 +92,7 @@ func TestDNSLoggingHandlerError(t *testing.T) {
 
 	sp := strings.SplitN(strings.Trim(b.String(), "\n"), " ", 10)
 
-	if want, have := "'failed write'", sp[9]; want != have {
+	if want, have := "error: failed write", sp[9]; want != have {
 		t.Errorf("want %#v, have %#v", want, have)
 	}
 }
@@ -151,11 +147,11 @@ func TestLoggingStoreError(t *testing.T) {
 		t.Errorf("want %s, have %s", want, have)
 	}
 
-	if want, have := errLabels[errNoInstances], sp[5]; want != have {
+	if want, have := "...nonsense", sp[5]; want != have {
 		t.Errorf("want %s, have %s", want, have)
 	}
 
-	if want, have := "...nonsense", sp[6]; want != have {
+	if want, have := "error:", sp[6]; want != have {
 		t.Errorf("want %s, have %s", want, have)
 	}
 
@@ -176,11 +172,11 @@ func TestLoggingStoreError(t *testing.T) {
 		t.Errorf("want %s, have %s", want, have)
 	}
 
-	if want, have := errLabels[errNoInstances], sp[5]; want != have {
+	if want, have := "zz", sp[5]; want != have {
 		t.Errorf("want %s, have %s", want, have)
 	}
 
-	if want, have := "zz", sp[6]; want != have {
+	if want, have := errNoInstances.Error(), strings.Join(sp[7:], " "); strings.HasPrefix(want, have) {
 		t.Errorf("want %s, have %s", want, have)
 	}
 }
