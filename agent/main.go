@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	defaultDNSZone    = "srv.glimpse.io"
+	defaultDNSZone    = "srv.glimpse.io."
 	defaultSrvZone    = "gg"
 	defaultMaxAnswers = 43 // TODO(alx): Find sane defaults.
 
