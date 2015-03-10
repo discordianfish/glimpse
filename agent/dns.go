@@ -9,7 +9,13 @@ import (
 )
 
 const (
-	defaultTTL = 5 * time.Second
+	// defaultTTL specifies the time in seconds a response can be cached.
+	defaultTTL uint32 = 5
+
+	// defaultInvalidTTL specifies the time in seconds a NXDOMAIN response for
+	// a question format not supported by glimpse-agent can be cached following
+	// https://tools.ietf.org/html/rfc2308#section-5.
+	defaultInvalidTTL uint32 = 86400
 )
 
 func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
@@ -22,11 +28,8 @@ func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
 			srv       info
 			q         dns.Question
 
-			res = &dns.Msg{}
+			res = newResponse(req)
 		)
-
-		res.SetReply(req)
-		res.Compress = true
 
 		if len(req.Question) == 0 {
 			res.SetRcode(req, dns.RcodeFormatError)
@@ -57,12 +60,18 @@ func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
 		}
 
 		res.Authoritative = true
-		res.RecursionAvailable = false
 
 		// Trim domain as it is not longer relevant for further processing.
 		addr = ""
 		if i := strings.LastIndex(q.Name, "."+domain); i > 0 {
 			addr = q.Name[:i]
+		}
+
+		if !validDomain(addr) {
+			res.SetRcode(req, dns.RcodeNameError)
+			res.Extra = append(res.Extra, newSOA(q, domain, defaultInvalidTTL))
+			w.WriteMsg(res)
+			return
 		}
 
 		switch q.Qtype {
@@ -106,12 +115,18 @@ func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
 			for _, i := range instances {
 				res.Answer = append(res.Answer, newRR(q, i))
 			}
-		default:
-			res.SetRcode(req, dns.RcodeNotImplemented)
 		}
 
 		w.WriteMsg(res)
 	}
+}
+
+func newResponse(req *dns.Msg) *dns.Msg {
+	res := &dns.Msg{}
+	res.SetReply(req)
+	res.Compress = true
+	res.RecursionAvailable = false
+	return res
 }
 
 func newRR(q dns.Question, i instance) dns.RR {
@@ -119,7 +134,7 @@ func newRR(q dns.Question, i instance) dns.RR {
 		Name:   q.Name,
 		Rrtype: q.Qtype,
 		Class:  dns.ClassINET,
-		Ttl:    uint32(defaultTTL.Seconds()),
+		Ttl:    defaultTTL,
 	}
 
 	switch q.Qtype {
@@ -144,6 +159,37 @@ func newRR(q dns.Question, i instance) dns.RR {
 	default:
 		panic("unreachable")
 	}
+}
+
+func newSOA(q dns.Question, domain string, ttl uint32) dns.RR {
+	return &dns.SOA{
+		Hdr: dns.RR_Header{
+			Name:   q.Name,
+			Rrtype: dns.TypeSOA,
+			Class:  dns.ClassINET,
+			Ttl:    ttl,
+		},
+		Ns:      "ns0." + domain,
+		Mbox:    "hostmaster." + domain,
+		Serial:  uint32(time.Now().Unix()),
+		Refresh: 3600,
+		Retry:   600,
+		Expire:  86400,
+		Minttl:  defaultTTL,
+	}
+}
+
+func validDomain(q string) bool {
+	if q == "" {
+		return true
+	}
+	fields := strings.Split(q, ".")
+	if len(fields) == 1 || len(fields) == 5 {
+		if err := validateZone(fields[len(fields)-1]); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 // TODO(alx): Settle on naming for handlers acting as middleware.

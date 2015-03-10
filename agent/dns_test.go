@@ -75,109 +75,119 @@ func TestDNSHandler(t *testing.T) {
 		w = &testWriter{}
 	)
 
-	for _, test := range []struct {
-		question string
+	for _, tt := range []struct {
+		q        string
 		qtype    uint16
 		answers  int
 		rcode    int
 		unknown  bool
+		soaCache uint32
 	}{
 		{
-			question: fmt.Sprintf("foo.bar.baz.qux.%s.%s", zone, domain),
+			q:     fmt.Sprintf("foo.bar.baz.qux.%s.%s", zone, domain),
+			qtype: dns.TypeSRV,
+			rcode: dns.RcodeNameError,
+		},
+		{
+			q:        fmt.Sprintf("foo.bar.baz.qux.%s.%s", "invalid", domain),
 			qtype:    dns.TypeSRV,
 			rcode:    dns.RcodeNameError,
+			soaCache: defaultInvalidTTL,
 		},
 		{
-			question: fmt.Sprintf("foo.bar.baz.qux.%s.%s", "invalid", domain),
-			qtype:    dns.TypeSRV,
-			rcode:    dns.RcodeNameError,
+			q:       "http.api.prod.harpoon.",
+			qtype:   dns.TypeSRV,
+			rcode:   dns.RcodeNameError,
+			unknown: true,
 		},
 		{
-			question: "http.api.prod.harpoon.",
-			qtype:    dns.TypeSRV,
-			rcode:    dns.RcodeNameError,
-			unknown:  true,
+			q:       fmt.Sprintf("http.api.prod.harpoon.%s", zone),
+			qtype:   dns.TypeSRV,
+			rcode:   dns.RcodeNameError,
+			unknown: true,
 		},
 		{
-			question: fmt.Sprintf("http.api.prod.harpoon.%s", zone),
-			qtype:    dns.TypeSRV,
-			rcode:    dns.RcodeNameError,
-			unknown:  true,
+			q:       fmt.Sprintf("http.api.prod.harpoon.%s.", zone),
+			qtype:   dns.TypeSRV,
+			rcode:   dns.RcodeNameError,
+			unknown: true,
 		},
 		{
-			question: fmt.Sprintf("http.api.prod.harpoon.%s.", zone),
-			qtype:    dns.TypeSRV,
-			rcode:    dns.RcodeNameError,
-			unknown:  true,
+			q:       fmt.Sprintf("http.api.prod.harpoon.%s.%s", zone, domain),
+			qtype:   dns.TypeSRV,
+			answers: 4,
 		},
 		{
-			question: fmt.Sprintf("http.api.prod.harpoon.%s.%s", zone, domain),
-			qtype:    dns.TypeSRV,
-			answers:  4,
+			q:       fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
+			qtype:   dns.TypeSRV,
+			answers: 2,
 		},
 		{
-			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
-			qtype:    dns.TypeSRV,
-			answers:  2,
+			q:     fmt.Sprintf("foo.bar.baz.qux.%s.%s", zone, domain),
+			qtype: dns.TypeA,
+			rcode: dns.RcodeNameError,
 		},
 		{
-			question: fmt.Sprintf("foo.bar.baz.qux.%s.%s", zone, domain),
-			qtype:    dns.TypeA,
-			rcode:    dns.RcodeNameError,
+			q:       fmt.Sprintf("http.api.prod.harpoon.%s.%s", zone, domain),
+			qtype:   dns.TypeA,
+			answers: 4,
 		},
 		{
-			question: fmt.Sprintf("http.api.prod.harpoon.%s.%s", zone, domain),
-			qtype:    dns.TypeA,
-			answers:  4,
+			q:       fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
+			qtype:   dns.TypeA,
+			answers: 2,
 		},
 		{
-			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
-			qtype:    dns.TypeA,
-			answers:  2,
+			q:       fmt.Sprintf("%s.%s", zone, domain),
+			qtype:   dns.TypeNS,
+			answers: 1,
 		},
 		{
-			question: fmt.Sprintf("%s.%s", zone, domain),
+			q:       domain,
+			qtype:   dns.TypeNS,
+			answers: 1,
+		},
+		{
+			q:     fmt.Sprintf("xx.%s", domain),
+			qtype: dns.TypeNS,
+		},
+		{
+			q:        fmt.Sprintf("foo.%s.%s", zone, domain),
 			qtype:    dns.TypeNS,
-			answers:  1,
-		},
-		{
-			question: domain,
-			qtype:    dns.TypeNS,
-			answers:  1,
-		},
-		{
-			question: fmt.Sprintf("xx.%s", domain),
-			qtype:    dns.TypeNS,
-		},
-		{
-			question: fmt.Sprintf("foo.%s.%s", zone, domain),
-			qtype:    dns.TypeNS,
 			rcode:    dns.RcodeNameError,
+			soaCache: defaultInvalidTTL,
 		},
 		{
-			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
+			q:        fmt.Sprintf("foo.%s.%s", zone, domain),
 			qtype:    dns.TypeAAAA,
-			rcode:    dns.RcodeNotImplemented,
+			rcode:    dns.RcodeNameError,
+			soaCache: defaultInvalidTTL,
 		},
 		{
-			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
-			qtype:    dns.TypeMX,
-			rcode:    dns.RcodeNotImplemented,
+			q:     fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
+			qtype: dns.TypeAAAA,
+			rcode: dns.RcodeSuccess,
 		},
 		{
-			question: fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
-			qtype:    dns.TypeTXT,
-			rcode:    dns.RcodeNotImplemented,
+			q:     fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
+			qtype: dns.TypeMX,
+			rcode: dns.RcodeSuccess,
+		},
+		{
+			q:     fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
+			qtype: dns.TypeTXT,
+			rcode: dns.RcodeSuccess,
 		},
 	} {
 		m := &dns.Msg{}
-		m.SetQuestion(test.question, test.qtype)
+		m.SetQuestion(tt.q, tt.qtype)
 
 		h(w, m)
 		r := w.msg
 
-		if want, got := test.rcode, r.Rcode; want != got {
-			t.Errorf("want rcode %s, got %s for %s", dns.RcodeToString[want], dns.RcodeToString[got], test.question)
+		if want, got := tt.rcode, r.Rcode; want != got {
+			f := dns.RcodeToString
+			t.Errorf("%s want rcode %s, got %s", tt.q, f[want], f[got])
 		}
 
 		if want, got := false, r.RecursionAvailable; want != got {
@@ -188,16 +198,16 @@ func TestDNSHandler(t *testing.T) {
 			t.Errorf("want message compression %t, got %t", want, got)
 		}
 
-		if want, got := !test.unknown, r.Authoritative; want != got {
+		if want, got := !tt.unknown, r.Authoritative; want != got {
 			t.Errorf("want authoritative %t, got %t", want, got)
 		}
 
-		if want, got := test.answers, len(r.Answer); want != got {
+		if want, got := tt.answers, len(r.Answer); want != got {
 			t.Errorf("want %d answers, got %d\n", want, got)
 		}
 
 		for _, answer := range r.Answer {
-			switch test.qtype {
+			switch tt.qtype {
 			case dns.TypeA:
 				_, ok := answer.(*dns.A)
 				if !ok {
@@ -208,6 +218,25 @@ func TestDNSHandler(t *testing.T) {
 				if !ok {
 					t.Error("want SRV resource record, got something else")
 				}
+			}
+		}
+
+		if tt.soaCache != 0 {
+			if want, got := 1, len(r.Extra); want != got {
+				t.Fatalf("%s want %d extras, got %d", tt.q, want, got)
+			}
+
+			soa, ok := r.Extra[0].(*dns.SOA)
+			if !ok {
+				t.Fatalf("%s want SOA resource record", tt.q)
+			}
+
+			if want, got := tt.soaCache, soa.Hdr.Ttl; want != got {
+				t.Errorf("%s want SOA TTL %d, got %d", tt.q, want, got)
+			}
+		} else {
+			if want, got := 0, len(r.Extra); want != got {
+				t.Errorf("%s want %d extras, got %d", tt.q, want, got)
 			}
 		}
 	}
