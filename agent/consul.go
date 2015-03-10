@@ -38,6 +38,9 @@ func (s *consulStore) getInstances(info info) (instances, error) {
 	// the expected response.
 	entries, _, err := s.client.Health().Service(info.product, jobTag, passingOnly, options)
 	if err != nil {
+		if strings.Contains(err.Error(), "No path to datacenter") {
+			return nil, newError(errNoInstances, "unknown zone %s", info.zone)
+		}
 		return nil, newError(errConsulAPI, "%s", err)
 	}
 
