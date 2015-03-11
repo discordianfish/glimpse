@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/hashicorp/consul/api"
-	consul "github.com/hashicorp/consul/consul/structs"
 )
 
 type consulStore struct {
@@ -43,8 +42,6 @@ func (s *consulStore) getInstances(info info) (instances, error) {
 		}
 		return nil, newError(errConsulAPI, "%s", err)
 	}
-
-	entries = filterEntries(entries)
 
 	if len(entries) == 0 {
 		return nil, newError(errNoInstances, "found for %s", info.addr())
@@ -99,30 +96,6 @@ func (s *consulStore) getServers(zone string) (is instances, err error) {
 	}
 
 	return is, nil
-}
-
-func filterEntries(entries []*api.ServiceEntry) []*api.ServiceEntry {
-	if len(entries) == 0 {
-		return entries
-	}
-
-	es := []*api.ServiceEntry{}
-
-	for _, e := range entries {
-		isHealthy := true
-
-		for _, check := range e.Checks {
-			if check.Status == consul.HealthCritical {
-				isHealthy = false
-			}
-		}
-
-		if isHealthy {
-			es = append(es, e)
-		}
-	}
-
-	return es
 }
 
 func infoToTags(info info) []string {

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/api"
-	consul "github.com/hashicorp/consul/consul/structs"
 )
 
 type test struct {
@@ -52,40 +51,6 @@ func TestConsulGetInstancesEmptyResult(t *testing.T) {
 
 	if !isNoInstances(err) {
 		t.Errorf("want %s, got %s", errNoInstances, err)
-	}
-}
-
-func TestConsulGetInstancesFailingCheck(t *testing.T) {
-	i, err := infoFromAddr("xmpp.chat.prod.fire.gg")
-	if err != nil {
-		t.Fatalf("info extraction failed: %s", err)
-	}
-
-	var (
-		host   = "host02.gg.local"
-		ip     = "10.3.4.5"
-		result = []*api.ServiceEntry{
-			createServiceEntry(i, 9090, host, ip, nil),
-			createServiceEntry(i, 9091, host, ip, nil),
-			createServiceEntry(i, 9092, host, ip, []*api.HealthCheck{
-				&api.HealthCheck{
-					Status: consul.HealthCritical,
-				},
-			}),
-		}
-	)
-
-	client, server := setupStubConsul(result, t)
-	defer server.Close()
-
-	store := newConsulStore(client)
-
-	is, err := store.getInstances(i)
-	if err != nil {
-		t.Fatalf("getInstances failed: %s", err)
-	}
-	if want, got := len(result)-1, len(is); want != got {
-		t.Errorf("want %d instances, got %d", want, got)
 	}
 }
 
