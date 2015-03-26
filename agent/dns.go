@@ -18,11 +18,10 @@ const (
 	defaultInvalidTTL uint32 = 86400
 )
 
-func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
+func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, req *dns.Msg) {
 		var (
 			addr      string
-			domain    string
 			err       error
 			instances instances
 			srv       info
@@ -46,14 +45,7 @@ func dnsHandler(store store, zone string, domains []string) dns.HandlerFunc {
 
 		q = req.Question[0]
 
-		for _, d := range domains {
-			if strings.HasSuffix(q.Name, d) {
-				domain = d
-				break
-			}
-		}
-
-		if domain == "" {
+		if !strings.HasSuffix(q.Name, domain) {
 			res.SetRcode(req, dns.RcodeNameError)
 			w.WriteMsg(res)
 			return

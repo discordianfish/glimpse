@@ -71,7 +71,7 @@ func TestDNSHandler(t *testing.T) {
 			},
 		}
 
-		h = dnsHandler(store, zone, []string{"unknown.domain.", domain})
+		h = dnsHandler(store, zone, domain)
 		w = &testWriter{}
 	)
 
@@ -244,7 +244,7 @@ func TestDNSHandler(t *testing.T) {
 
 func TestDNSHandlerZeroQuestions(t *testing.T) {
 	var (
-		h = dnsHandler(&testStore{}, "tt", []string{dns.Fqdn("test.glimpse.io")})
+		h = dnsHandler(&testStore{}, "tt", dns.Fqdn("test.glimpse.io"))
 		m = &dns.Msg{}
 		w = &testWriter{}
 	)
@@ -263,7 +263,7 @@ func TestDNSHandlerZeroQuestions(t *testing.T) {
 
 func TestDNSHandlerMultiQuestions(t *testing.T) {
 	var (
-		h = dnsHandler(&testStore{}, "tt", []string{dns.Fqdn("test.glimpse.io")})
+		h = dnsHandler(&testStore{}, "tt", dns.Fqdn("test.glimpse.io"))
 		m = &dns.Msg{}
 		w = &testWriter{}
 	)
@@ -293,7 +293,7 @@ func TestDNSHandlerMultiQuestions(t *testing.T) {
 
 func TestDNSHandlerBrokenStore(t *testing.T) {
 	var (
-		h = dnsHandler(&brokenStore{}, "tt", []string{dns.Fqdn("test.glimpse.io")})
+		h = dnsHandler(&brokenStore{}, "tt", dns.Fqdn("test.glimpse.io"))
 		m = &dns.Msg{}
 		w = &testWriter{}
 	)

@@ -35,11 +35,10 @@ var (
 
 func main() {
 	var (
-		dnsZones dnsZones
-
 		consulAddr = flag.String("consul.addr", "127.0.0.1:8500", "consul lookup address")
 		consulInfo = flag.String("consul.info", "consul info", "info command")
 		dnsAddr    = flag.String("dns.addr", ":5959", "DNS address to bind to")
+		dnsZone    = flag.String("dns.zone", defaultDNSZone, "DNS zone")
 		srvZone    = flag.String("srv.zone", defaultSrvZone, "srv zone")
 		httpAddr   = flag.String("http.addr", ":5960", "HTTP address to bind to")
 		maxAnswers = flag.Int(
@@ -48,11 +47,10 @@ func main() {
 			"DNS maximum answers returned via UDP",
 		)
 	)
-	flag.Var(&dnsZones, "dns.zone", "DNS zone")
 	flag.Parse()
 
-	if len(dnsZones) == 0 {
-		dnsZones = append(dnsZones, defaultDNSZone)
+	if !rDNSZone.MatchString(*dnsZone) {
+		log.Fatalf("invalid DNS zone: %s", *dnsZone)
 	}
 
 	log.Printf("glimpse-agent starting. v%s", version)
@@ -89,7 +87,7 @@ func main() {
 					dnsHandler(
 						store,
 						*srvZone,
-						dnsZones,
+						dns.Fqdn(*dnsZone),
 					),
 				),
 			),
@@ -157,18 +155,4 @@ func registerConsulCollector(consulInfo string) {
 
 		break
 	}
-}
-
-type dnsZones []string
-
-func (z *dnsZones) String() string {
-	return fmt.Sprintf("%s", *z)
-}
-
-func (z *dnsZones) Set(value string) error {
-	if !rDNSZone.MatchString(value) {
-		return fmt.Errorf("invalid DNS zone: %s", value)
-	}
-	*z = append(*z, dns.Fqdn(value))
-	return nil
 }
