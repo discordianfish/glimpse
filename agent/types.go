@@ -30,13 +30,17 @@ type store interface {
 	getServers(string) (instances, error)
 }
 
-type instances []instance
-
 type instance struct {
 	host string
 	ip   net.IP
 	port uint16
 }
+
+type instances []instance
+
+func (is instances) Len() int           { return len(is) }
+func (is instances) Swap(i, j int)      { is[i], is[j] = is[j], is[i] }
+func (is instances) Less(i, j int) bool { return is[i].host < is[j].host }
 
 // TODO(alx): Find better naming.
 // TODO(alx): evaluate if provider has a place here.
@@ -50,13 +54,6 @@ type info struct {
 	provider string
 	service  string
 	zone     string
-}
-
-func validateZone(zone string) error {
-	if !rZone.MatchString(zone) {
-		return fmt.Errorf("zone %q is invalid", zone)
-	}
-	return nil
 }
 
 func infoFromAddr(addr string) (info, error) {
@@ -74,8 +71,8 @@ func infoFromAddr(addr string) (info, error) {
 		service = fields[0]
 	)
 
-	if err := validateZone(zone); err != nil {
-		return info{}, err
+	if !rZone.MatchString(zone) {
+		return info{}, fmt.Errorf("zone %q is invalid", zone)
 	}
 	if !rField.MatchString(product) {
 		return info{}, fmt.Errorf("product %q is invalid", product)
