@@ -67,7 +67,7 @@ func TestDNSHandler(t *testing.T) {
 				},
 			},
 			servers: map[string]instances{
-				zone: instances{{host: "foo"}},
+				zone: instances{{host: "foo"}, {host: "bar"}},
 			},
 		}
 
@@ -140,12 +140,12 @@ func TestDNSHandler(t *testing.T) {
 		{
 			q:       fmt.Sprintf("%s.%s", zone, domain),
 			qtype:   dns.TypeNS,
-			answers: 1,
+			answers: 2,
 		},
 		{
 			q:       domain,
 			qtype:   dns.TypeNS,
-			answers: 1,
+			answers: 2,
 		},
 		{
 			q:     fmt.Sprintf("xx.%s", domain),
@@ -177,6 +177,27 @@ func TestDNSHandler(t *testing.T) {
 			q:     fmt.Sprintf("http.web.prod.harpoon.%s.%s", zone, domain),
 			qtype: dns.TypeTXT,
 			rcode: dns.RcodeSuccess,
+		},
+		{
+			q:       fmt.Sprintf("ns1.%s", domain),
+			qtype:   dns.TypeA,
+			answers: 1,
+		},
+		{
+			q:     fmt.Sprintf("ns2.%s", domain),
+			qtype: dns.TypeA,
+			rcode: dns.RcodeSuccess,
+		},
+		{
+			q:        fmt.Sprintf("ns2a.%s", domain),
+			qtype:    dns.TypeA,
+			rcode:    dns.RcodeNameError,
+			soaCache: defaultInvalidTTL,
+		},
+		{
+			q:       fmt.Sprintf("ns0.%s.%s", zone, domain),
+			qtype:   dns.TypeA,
+			answers: 1,
 		},
 	} {
 		m := &dns.Msg{}

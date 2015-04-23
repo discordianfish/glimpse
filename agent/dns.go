@@ -1,8 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"net"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,7 +24,8 @@ const (
 
 var (
 	serviceQuestionRE = regexp.MustCompile(`^([[:alnum:]\-]+\.){4}[[:alnum:]]{2}$`)
-	serverQuestionRE  = regexp.MustCompile(`^([[:alnum:]]{2})?$`)
+	serverQuestionRE  = regexp.MustCompile(`^(ns[0-9]+|(ns[0-9]+\.)?[[:alnum:]]{2})?$`)
+	nameserverRE      = regexp.MustCompile(`^ns[0-9]+$`)
 )
 
 type dnsHandler struct {
@@ -109,21 +113,52 @@ func (h *dnsHandler) serverResponse(name string, q dns.Question, res *dns.Msg) {
 		return
 	}
 
-	if name != "" {
-		if err := validateZone(name); err != nil {
-			res.Rcode = dns.RcodeNameError
-			return
-		}
+	ns, zone := parseServerQuestion(name)
+	if ns != "" && q.Qtype == dns.TypeNS {
+		return
 	}
 
-	servers, err := h.store.getServers(name)
+	servers, err := h.store.getServers(zone)
 	if err != nil && !isNoInstances(err) {
 		res.Rcode = dns.RcodeServerFailure
 		return
 	}
+	sort.Sort(servers)
 
-	for _, s := range servers {
-		res.Answer = append(res.Answer, newRR(q, s))
+	// return list of all nameservers
+	if ns == "" {
+		for i, server := range servers {
+			server.host = fmt.Sprintf("ns%d.%s", i, q.Name)
+			res.Answer = append(res.Answer, newRR(q, server))
+		}
+		return
+	}
+
+	// return requested nameserver
+	index, err := strconv.Atoi(ns[2:])
+	if err != nil {
+		res.Rcode = dns.RcodeNameError
+		return
+	}
+	if len(servers) <= index {
+		return
+	}
+	res.Answer = append(res.Answer, newRR(q, servers[index]))
+}
+
+func parseServerQuestion(name string) (nameserver, zone string) {
+	fields := strings.Split(name, ".")
+	switch len(fields) {
+	case 1:
+		if nameserverRE.MatchString(fields[0]) {
+			return fields[0], ""
+		} else {
+			return "", fields[0]
+		}
+	case 2:
+		return fields[0], fields[1]
+	default:
+		return "", ""
 	}
 }
 
