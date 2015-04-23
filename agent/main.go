@@ -21,8 +21,6 @@ const (
 	defaultDNSZone    = "srv.glimpse.io."
 	defaultSrvZone    = "gg"
 	defaultMaxAnswers = 43 // TODO(alx): Find sane defaults.
-
-	routeLookup = `/lookup/{name:[a-z0-9\-\.]+}`
 )
 
 var (
@@ -84,9 +82,8 @@ func main() {
 			dnsMetricsHandler(
 				protocolHandler(
 					*maxAnswers,
-					dnsHandler(
+					newDNSHandler(
 						store,
-						*srvZone,
 						dns.Fqdn(*dnsZone),
 					),
 				),

@@ -71,7 +71,7 @@ func TestDNSHandler(t *testing.T) {
 			},
 		}
 
-		h = dnsHandler(store, zone, domain)
+		h = newDNSHandler(store, domain)
 		w = &testWriter{}
 	)
 
@@ -182,7 +182,7 @@ func TestDNSHandler(t *testing.T) {
 		m := &dns.Msg{}
 		m.SetQuestion(tt.q, tt.qtype)
 
-		h(w, m)
+		h.ServeDNS(w, m)
 		r := w.msg
 
 		if want, got := tt.rcode, r.Rcode; want != got {
@@ -242,28 +242,9 @@ func TestDNSHandler(t *testing.T) {
 	}
 }
 
-func TestDNSHandlerZeroQuestions(t *testing.T) {
-	var (
-		h = dnsHandler(&testStore{}, "tt", dns.Fqdn("test.glimpse.io"))
-		m = &dns.Msg{}
-		w = &testWriter{}
-	)
-
-	h(w, m)
-	r := w.msg
-
-	if want, got := dns.RcodeFormatError, r.Rcode; want != got {
-		t.Errorf(
-			"want rcode %s, got %s",
-			dns.RcodeToString[want],
-			dns.RcodeToString[got],
-		)
-	}
-}
-
 func TestDNSHandlerMultiQuestions(t *testing.T) {
 	var (
-		h = dnsHandler(&testStore{}, "tt", dns.Fqdn("test.glimpse.io"))
+		h = newDNSHandler(&testStore{}, dns.Fqdn("test.glimpse.io"))
 		m = &dns.Msg{}
 		w = &testWriter{}
 	)
@@ -279,7 +260,7 @@ func TestDNSHandlerMultiQuestions(t *testing.T) {
 		}
 	}
 
-	h(w, m)
+	h.ServeDNS(w, m)
 	r := w.msg
 
 	if want, got := dns.RcodeNotImplemented, r.Rcode; want != got {
@@ -293,13 +274,13 @@ func TestDNSHandlerMultiQuestions(t *testing.T) {
 
 func TestDNSHandlerBrokenStore(t *testing.T) {
 	var (
-		h = dnsHandler(&brokenStore{}, "tt", dns.Fqdn("test.glimpse.io"))
+		h = newDNSHandler(&brokenStore{}, dns.Fqdn("test.glimpse.io"))
 		m = &dns.Msg{}
 		w = &testWriter{}
 	)
 
 	m.SetQuestion("http.api.prod.harpoon.tt.test.glimpse.io.", dns.TypeSRV)
-	h(w, m)
+	h.ServeDNS(w, m)
 	r := w.msg
 
 	if want, got := dns.RcodeServerFailure, r.Rcode; want != got {

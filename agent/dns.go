@@ -2,6 +2,7 @@ package main
 
 import (
 	"net"
+	"regexp"
 	"strings"
 	"time"
 
@@ -18,90 +19,111 @@ const (
 	defaultInvalidTTL uint32 = 86400
 )
 
-func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
-	return func(w dns.ResponseWriter, req *dns.Msg) {
-		var res = newResponse(req)
+var (
+	serviceQuestionRE = regexp.MustCompile(`^([[:alnum:]\-]+\.){4}[[:alnum:]]{2}$`)
+	serverQuestionRE  = regexp.MustCompile(`^([[:alnum:]]{2})?$`)
+)
 
-		if len(req.Question) == 0 {
-			res.SetRcode(req, dns.RcodeFormatError)
-			w.WriteMsg(res)
-			return
-		}
+type dnsHandler struct {
+	store  store
+	domain string
+}
 
-		// http://maradns.samiam.org/multiple.qdcount.html
-		if len(req.Question) > 1 {
-			res.SetRcode(req, dns.RcodeNotImplemented)
-			w.WriteMsg(res)
-			return
-		}
+func newDNSHandler(store store, domain string) *dnsHandler {
+	return &dnsHandler{
+		store:  store,
+		domain: domain,
+	}
+}
 
-		q := req.Question[0]
+func (h *dnsHandler) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
+	var res = newResponse(req)
 
-		if !strings.HasSuffix(q.Name, domain) {
-			res.SetRcode(req, dns.RcodeNameError)
-			w.WriteMsg(res)
-			return
-		}
-
-		res.Authoritative = true
-
-		// Trim domain as it is not longer relevant for further processing.
-		addr := ""
-		if i := strings.LastIndex(q.Name, "."+domain); i > 0 {
-			addr = q.Name[:i]
-		}
-
-		if !validDomain(addr) {
-			res.SetRcode(req, dns.RcodeNameError)
-			res.Extra = append(res.Extra, newSOA(q, domain, defaultInvalidTTL))
-			w.WriteMsg(res)
-			return
-		}
-
-		switch q.Qtype {
-		case dns.TypeA, dns.TypeSRV:
-			srv, err := infoFromAddr(addr)
-			if err != nil {
-				res.SetRcode(req, dns.RcodeNameError)
-				break
-			}
-
-			instances, err := store.getInstances(srv)
-			if err != nil {
-				// TODO(ts): Maybe return NoError for registered service without
-				//           instances.
-				if isNoInstances(err) {
-					res.SetRcode(req, dns.RcodeNameError)
-					break
-				}
-
-				res.SetRcode(req, dns.RcodeServerFailure)
-				break
-			}
-
-			for _, i := range instances {
-				res.Answer = append(res.Answer, newRR(q, i))
-			}
-		case dns.TypeNS:
-			if addr != "" {
-				if err := validateZone(addr); err != nil {
-					res.SetRcode(req, dns.RcodeNameError)
-					break
-				}
-			}
-
-			instances, err := store.getServers(addr)
-			if err != nil && !isNoInstances(err) {
-				res.SetRcode(req, dns.RcodeServerFailure)
-				break
-			}
-
-			for _, i := range instances {
-				res.Answer = append(res.Answer, newRR(q, i))
-			}
-		}
-
+	// http://maradns.samiam.org/multiple.qdcount.html
+	if len(req.Question) > 1 {
+		res.Rcode = dns.RcodeNotImplemented
 		w.WriteMsg(res)
+		return
+	}
+
+	q := req.Question[0]
+
+	if !strings.HasSuffix(q.Name, h.domain) {
+		res.Rcode = dns.RcodeNameError
+		w.WriteMsg(res)
+		return
+	}
+
+	res.Authoritative = true
+
+	// Trim domain as it is not longer relevant for further processing.
+	name := ""
+	if i := strings.LastIndex(q.Name, "."+h.domain); i > 0 {
+		name = q.Name[:i]
+	}
+
+	switch {
+	case serviceQuestionRE.MatchString(name):
+		h.serviceResponse(name, q, res)
+	case serverQuestionRE.MatchString(name):
+		h.serverResponse(name, q, res)
+	default:
+		res.Rcode = dns.RcodeNameError
+		res.Extra = append(res.Extra, newSOA(q, h.domain, defaultInvalidTTL))
+	}
+
+	w.WriteMsg(res)
+}
+
+func (h *dnsHandler) serviceResponse(name string, q dns.Question, res *dns.Msg) {
+	if q.Qtype != dns.TypeA && q.Qtype != dns.TypeSRV {
+		return
+	}
+
+	srv, err := infoFromAddr(name)
+	if err != nil {
+		res.Rcode = dns.RcodeNameError
+		return
+	}
+
+	instances, err := h.store.getInstances(srv)
+	if err != nil {
+		// TODO(ts): Maybe return NoError for registered service without
+		//           instances.
+		if isNoInstances(err) {
+			res.Rcode = dns.RcodeNameError
+			return
+		}
+
+		res.Rcode = dns.RcodeServerFailure
+		return
+	}
+
+	for _, i := range instances {
+		res.Answer = append(res.Answer, newRR(q, i))
+	}
+}
+
+func (h *dnsHandler) serverResponse(name string, q dns.Question, res *dns.Msg) {
+	if q.Qtype != dns.TypeA && q.Qtype != dns.TypeNS {
+		return
+	}
+
+	if name != "" {
+		if err := validateZone(name); err != nil {
+			res.Rcode = dns.RcodeNameError
+			return
+		}
+	}
+
+	servers, err := h.store.getServers(name)
+	if err != nil && !isNoInstances(err) {
+		res.Rcode = dns.RcodeServerFailure
+		return
+	}
+
+	for _, s := range servers {
+		res.Answer = append(res.Answer, newRR(q, s))
 	}
 }
 
@@ -161,19 +183,6 @@ func newSOA(q dns.Question, domain string, ttl uint32) dns.RR {
 		Expire:  86400,
 		Minttl:  defaultTTL,
 	}
-}
-
-func validDomain(q string) bool {
-	if q == "" {
-		return true
-	}
-	fields := strings.Split(q, ".")
-	if len(fields) == 1 || len(fields) == 5 {
-		if err := validateZone(fields[len(fields)-1]); err == nil {
-			return true
-		}
-	}
-	return false
 }
 
 // TODO(alx): Settle on naming for handlers acting as middleware.
