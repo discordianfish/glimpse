@@ -20,15 +20,7 @@ const (
 
 func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, req *dns.Msg) {
-		var (
-			addr      string
-			err       error
-			instances instances
-			srv       info
-			q         dns.Question
-
-			res = newResponse(req)
-		)
+		var res = newResponse(req)
 
 		if len(req.Question) == 0 {
 			res.SetRcode(req, dns.RcodeFormatError)
@@ -43,7 +35,7 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 			return
 		}
 
-		q = req.Question[0]
+		q := req.Question[0]
 
 		if !strings.HasSuffix(q.Name, domain) {
 			res.SetRcode(req, dns.RcodeNameError)
@@ -54,7 +46,7 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 		res.Authoritative = true
 
 		// Trim domain as it is not longer relevant for further processing.
-		addr = ""
+		addr := ""
 		if i := strings.LastIndex(q.Name, "."+domain); i > 0 {
 			addr = q.Name[:i]
 		}
@@ -68,13 +60,13 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 
 		switch q.Qtype {
 		case dns.TypeA, dns.TypeSRV:
-			srv, err = infoFromAddr(addr)
+			srv, err := infoFromAddr(addr)
 			if err != nil {
 				res.SetRcode(req, dns.RcodeNameError)
 				break
 			}
 
-			instances, err = store.getInstances(srv)
+			instances, err := store.getInstances(srv)
 			if err != nil {
 				// TODO(ts): Maybe return NoError for registered service without
 				//           instances.
@@ -98,7 +90,7 @@ func dnsHandler(store store, zone, domain string) dns.HandlerFunc {
 				}
 			}
 
-			instances, err = store.getServers(addr)
+			instances, err := store.getServers(addr)
 			if err != nil && !isNoInstances(err) {
 				res.SetRcode(req, dns.RcodeServerFailure)
 				break
